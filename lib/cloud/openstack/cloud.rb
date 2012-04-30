@@ -3,9 +3,6 @@
 module Bosh::OpenStackCloud
 
   class Cloud < Bosh::Cloud
-    DEFAULT_MAX_RETRIES = 2
-    DEFAULT_AVAILABILITY_ZONE = "us-east-1a"
-    DEFAULT_EC2_ENDPOINT = "ec2.amazonaws.com"
     METADATA_TIMEOUT = 5 # seconds
     DEVICE_POLL_TIMEOUT = 60 # seconds
 
@@ -22,26 +19,18 @@ module Bosh::OpenStackCloud
 
       @logger = Bosh::Clouds::Config.logger
 
-      @openstack_logger = @logger # TODO make configurable
-
       @agent_properties = @options["agent"] || {}
       @openstack_properties = @options["openstack"]
 
-      @default_key_name = @aws_properties["default_key_name"]
-      @default_security_groups = @aws_properties["default_security_groups"]
-
       openstack_params = {
-        :access_key_id => @aws_properties["access_key_id"],
-        :secret_access_key => @aws_properties["secret_access_key"],
-        :ec2_endpoint => @aws_properties["ec2_endpoint"] || DEFAULT_EC2_ENDPOINT,
-        :max_retries => @aws_properties["max_retries"] || DEFAULT_MAX_RETRIES,
-        :logger => @openstack_logger
+        :provider => "OpenStack",
+        :openstack_auth_url => @openstack_properties["openstack_auth_url"],
+        :openstack_username => @openstack_properties["openstack_username"],
+        :openstack_api_key => @openstack_properties["openstack_api_key"],
+        :openstack_tenant => @openstack_properties["openstack_tenant"]
       }
 
-      # AWS Ruby SDK is threadsafe but Ruby autoload isn't,
-      # so we need to trigger eager autoload while constructing CPI
-      AWS.eager_autoload!
-      @ec2 = AWS::EC2.new(aws_params)
+      @openstack = Fog::Compute.new(openstack_params)
 
       @metadata_lock = Mutex.new
     end
@@ -68,38 +57,19 @@ module Bosh::OpenStackCloud
       with_thread_name("create_vm(#{agent_id}, ...)") do
         network_configurator = NetworkConfigurator.new(network_spec)
 
-        user_data = {
-          "registry" => {
-            "endpoint" => @registry.endpoint
-          }
-        }
-
         if disk_locality
           # TODO: use as hint for availability zones
           @logger.debug("Disk locality is ignored by AWS CPI")
         end
 
-        security_groups =
-          network_configurator.security_groups(@default_security_groups)
-        @logger.debug("using security groups: #{security_groups.join(', ')}")
-
         instance_params = {
           :image_id => stemcell_id,
-          :count => 1,
-          :key_name => resource_pool["key_name"] || @default_key_name,
-          :security_groups => security_groups,
-          :instance_type => resource_pool["instance_type"],
-          :user_data => Yajl::Encoder.encode(user_data)
+          :flavor_id => resource_pool["instance_type"],
         }
 
-        availability_zone = resource_pool["availability_zone"]
-        if availability_zone
-          instance_params[:availability_zone] = availability_zone
-        end
-
         @logger.info("Creating new instance...")
-        instance = @ec2.instances.create(instance_params)
-        state = instance.status
+        instance = @os.servers.create(instance_params)
+        state = instance.state
 
         @logger.info("Creating new instance `#{instance.id}', " \
                      "state is `#{state}'")
@@ -109,39 +79,34 @@ module Bosh::OpenStackCloud
         network_configurator.configure(@ec2, instance)
 
         settings = initial_agent_settings(agent_id, network_spec, environment)
-        @registry.update_settings(instance.id, settings)
 
         instance.id
       end
     end
 
     ##
-    # Terminates EC2 instance and waits until it reports as terminated
+    # Terminates OpenStack instance and waits until it reports as terminated
     # @param [String] vm_id Running instance id
     def delete_vm(instance_id)
       with_thread_name("delete_vm(#{instance_id})") do
-        instance = @ec2.instances[instance_id]
+        instance = @os.instances[instance_id]
 
-        instance.terminate
-        state = instance.status
-
-        # TODO: should this be done before or after deleting VM?
-        @logger.info("Deleting instance settings for `#{instance.id}'")
-        @registry.delete_settings(instance.id)
+        instance.destroy
+        state = instance.state
 
         @logger.info("Deleting instance `#{instance.id}', " \
                      "state is `#{state}'")
 
-        wait_resource(instance, state, :terminated)
+        wait_resource(instance, state, :deleted)
       end
     end
 
     ##
-    # Reboots EC2 instance
+    # Reboots OpenStack instance
     # @param [String] instance_id Running instance id
     def reboot_vm(instance_id)
       with_thread_name("reboot_vm(#{instance_id})") do
-        instance = @ec2.instances[instance_id]
+        instance = @os.instances[instance_id]
         soft_reboot(instance)
       end
     end
@@ -166,16 +131,8 @@ module Bosh::OpenStackCloud
           cloud_error("AWS CPI maximum disk size is 1 TiB")
         end
 
-        if instance_id
-          instance = @ec2.instances[instance_id]
-          availability_zone = instance.availability_zone
-        else
-          availability_zone = DEFAULT_AVAILABILITY_ZONE
-        end
-
         volume_params = {
           :size => (size / 1024.0).ceil,
-          :availability_zone => availability_zone
         }
 
         volume = @ec2.volumes.create(volume_params)
@@ -345,8 +302,7 @@ module Bosh::OpenStackCloud
 
     ##
     # Generates initial agent settings. These settings will be read by agent
-    # from AWS registry (also a BOSH component) on a target instance. Disk
-    # conventions for amazon are:
+    # from the OS API on a target instance. Disk conventions for amazon are:
     # system disk: /dev/sda
     # ephemeral disk: /dev/sdb
     # EBS volumes can be configured to map to other device names later (sdf
@@ -380,9 +336,8 @@ module Bosh::OpenStackCloud
         raise ArgumentError, "block is not provided"
       end
 
-      settings = @registry.read_settings(instance.id)
+      settings = @os.server(instance.id)
       yield settings
-      @registry.update_settings(instance.id, settings)
     end
 
     def generate_unique_name
@@ -518,36 +473,17 @@ module Bosh::OpenStackCloud
     end
 
     ##
-    # Soft reboots EC2 instance
+    # Soft reboots OpenStack instance
     # @param [AWS::EC2::Instance] instance EC2 instance
     def soft_reboot(instance)
-      # There is no trackable status change for the instance being
-      # rebooted, so it's up to CPI client to keep track of agent
-      # being ready after reboot.
       instance.reboot
     end
 
     ##
-    # Hard reboots EC2 instance
+    # Hard reboots OpenStack instance
     # @param [AWS::EC2::Instance] instance EC2 instance
     def hard_reboot(instance)
-      # N.B. This will only work with ebs-store instances,
-      # as instance-store instances don't support stop/start.
-      instance.stop
-      state = instance.status
-
-      @logger.info("Stopping instance `#{instance.id}', " \
-                   "state is `#{state}'")
-
-      wait_resource(instance, state, :stopped)
-
-      instance.start
-      state = instance.status
-
-      @logger.info("Starting instance `#{instance.id}', " \
-                   "state is `#{state}'")
-
-      wait_resource(instance, state, :running)
+      instance.reboot(type = 'HARD')
     end
 
     ##
@@ -560,14 +496,6 @@ module Bosh::OpenStackCloud
           @options["aws"]["access_key_id"] &&
           @options["aws"]["secret_access_key"]
         raise ArgumentError, "Invalid AWS configuration parameters"
-      end
-
-      unless @options.has_key?("registry") &&
-          @options["registry"].is_a?(Hash) &&
-          @options["registry"]["endpoint"] &&
-          @options["registry"]["user"] &&
-          @options["registry"]["password"]
-        raise ArgumentError, "Invalid registry configuration parameters"
       end
     end
 
