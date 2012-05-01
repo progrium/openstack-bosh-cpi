@@ -25,7 +25,7 @@ module Bosh::OpenStackCloud
         :openstack_tenant => @openstack_properties["openstack_tenant"]
       }
 
-      @openstack = Fog::Compute.new(openstack_params)
+      @os = Fog::Compute.new(openstack_params)
     end
 
     ##
@@ -48,11 +48,8 @@ module Bosh::OpenStackCloud
     def create_vm(agent_id, stemcell_id, resource_pool,
                   network_spec, disk_locality = nil, environment = nil)
       with_thread_name("create_vm(#{agent_id}, ...)") do
-        network_configurator = NetworkConfigurator.new(network_spec)
-
         if disk_locality
-          # TODO: use as hint for availability zones
-          @logger.debug("Disk locality is ignored by AWS CPI")
+          @logger.debug("Disk locality is ignored by OpenStack CPI")
         end
 
         instance_params = {
@@ -68,8 +65,6 @@ module Bosh::OpenStackCloud
                      "state is `#{state}'")
 
         wait_resource(instance, state, :running)
-
-        network_configurator.configure(@ec2, instance)
 
         settings = initial_agent_settings(agent_id, network_spec, environment)
 
@@ -213,10 +208,10 @@ module Bosh::OpenStackCloud
 
     ##
     # Generates initial agent settings. These settings will be read by agent
-    # from the OS API on a target instance. Disk conventions for amazon are:
+    # from the OS API on a target instance. Disk conventions are:
     # system disk: /dev/sda
     # ephemeral disk: /dev/sdb
-    # EBS volumes can be configured to map to other device names later (sdf
+    # Volumes can be configured to map to other device names later (sdf
     # through sdp, also some kernels will remap sd* to xvd*).
     #
     # @param [String] agent_id Agent id (will be picked up by agent to
