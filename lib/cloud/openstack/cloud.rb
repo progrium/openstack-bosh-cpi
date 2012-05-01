@@ -105,30 +105,22 @@ module Bosh::OpenStackCloud
     end
 
     ##
-    # Creates a new EBS volume
+    # Creates a new OpenStack volume
     # @param [Integer] size disk size in MiB
     # @param [optional, String] instance_id vm id
     #        of the VM that this disk will be attached to
-    # @return [String] created EBS volume id
+    # @return [String] created OpenStack volume id
     def create_disk(size, instance_id = nil)
       with_thread_name("create_disk(#{size}, #{instance_id})") do
         unless size.kind_of?(Integer)
           raise ArgumentError, "disk size needs to be an integer"
         end
 
-        if (size < 1024)
-          cloud_error("AWS CPI minimum disk size is 1 GiB")
-        end
-
-        if (size > 1024 * 1000)
-          cloud_error("AWS CPI maximum disk size is 1 TiB")
-        end
-
         volume_params = {
           :size => (size / 1024.0).ceil,
         }
 
-        volume = @ec2.volumes.create(volume_params)
+        volume = @os.volumes.create_volume(volume_params)
         state = volume.state
 
         @logger.info("Creating volume `#{volume.id}', " \
@@ -141,20 +133,20 @@ module Bosh::OpenStackCloud
     end
 
     ##
-    # Deletes EBS volume
+    # Deletes OpenStack volume
     # @param [String] disk_id volume id
     # @raise [Bosh::Clouds::CloudError] if disk is not in available state
     # @return nil
     def delete_disk(disk_id)
       with_thread_name("delete_disk(#{disk_id})") do
-        volume = @ec2.volumes[disk_id]
+        volume = @os.volumes[disk_id]
         state = volume.state
 
         if state != :available
           cloud_error("Cannot delete volume `#{volume.id}', state is #{state}")
         end
 
-        volume.delete
+        volume.delete_volume
 
         begin
           state = volume.state
@@ -162,7 +154,7 @@ module Bosh::OpenStackCloud
                        "state is `#{state}'")
 
           wait_resource(volume, state, :deleted)
-        rescue AWS::EC2::Errors::InvalidVolume::NotFound
+        rescue Fog::Compute::OpenStack::NotFound
         end
 
         @logger.info("Volume `#{disk_id}' has been deleted")
@@ -171,10 +163,10 @@ module Bosh::OpenStackCloud
 
     def attach_disk(instance_id, disk_id)
       with_thread_name("attach_disk(#{instance_id}, #{disk_id})") do
-        instance = @ec2.instances[instance_id]
-        volume = @ec2.volumes[disk_id]
+        instance = @os.servers[instance_id]
+        volume = @os.volumes[disk_id]
 
-        device_name = attach_ebs_volume(instance, volume)
+        device_name = instance.attach_volume(volume.id, instance.id, disk_id)
 
         update_agent_settings(instance) do |settings|
           settings["disks"] ||= {}
@@ -186,8 +178,8 @@ module Bosh::OpenStackCloud
 
     def detach_disk(instance_id, disk_id)
       with_thread_name("detach_disk(#{instance_id}, #{disk_id})") do
-        instance = @ec2.instances[instance_id]
-        volume = @ec2.volumes[disk_id]
+        instance = @os.servers[instance_id]
+        volume = @os.volumes[disk_id]
 
         update_agent_settings(instance) do |settings|
           settings["disks"] ||= {}
@@ -195,7 +187,7 @@ module Bosh::OpenStackCloud
           settings["disks"]["persistent"].delete(disk_id)
         end
 
-        detach_ebs_volume(instance, volume)
+        instance.detach_volume(instance.id, volume.id)
 
         @logger.info("Detached `#{disk_id}' from `#{instance_id}'")
       end
@@ -263,77 +255,16 @@ module Bosh::OpenStackCloud
       UUIDTools::UUID.random_create.to_s
     end
 
-    def attach_ebs_volume(instance, volume)
-      device_names = Set.new(instance.block_device_mappings.keys)
-      new_attachment = nil
-
-      ("f".."p").each do |char| # f..p is what console suggests
-        # Some kernels will remap sdX to xvdX, so agent needs
-        # to lookup both (sd, then xvd)
-        dev_name = "/dev/sd#{char}"
-        if device_names.include?(dev_name)
-          @logger.warn("`#{dev_name}' on `#{instance.id}' is taken")
-          next
-        end
-        new_attachment = volume.attach_to(instance, dev_name)
-        break
-      end
-
-      if new_attachment.nil?
-        # TODO: better messaging?
-        cloud_error("Instance has too many disks attached")
-      end
-
-      state = new_attachment.status
-
-      @logger.info("Attaching `#{volume.id}' to #{instance.id}, " \
-                   "state is #{state}'")
-
-      wait_resource(new_attachment, state, :attached)
-      device_name = new_attachment.device
-
-      @logger.info("Attached `#{volume.id}' to `#{instance.id}', " \
-                   "device name is `#{device_name}'")
-
-      device_name
-    end
-
-    def detach_ebs_volume(instance, volume)
-      mappings = instance.block_device_mappings
-
-      device_map = mappings.inject({}) do |hash, (device_name, attachment)|
-        hash[attachment.volume.id] = device_name
-        hash
-      end
-
-      if device_map[volume.id].nil?
-        cloud_error("Disk `#{volume.id}' is not attached " \
-                    "to instance `#{instance.id}'")
-      end
-
-      attachment = volume.detach_from(instance, device_map[volume.id])
-      state = attachment.status
-
-      @logger.info("Detaching `#{volume.id}' from `#{instance.id}', " \
-                   "state is #{state}'")
-
-      begin
-        wait_resource(attachment, state, :detached)
-      rescue AWS::Core::Resource::NotFound
-        # It's OK, just means attachment is gone when we're asking for state
-      end
-    end
-
     ##
     # Soft reboots OpenStack instance
-    # @param [AWS::EC2::Instance] instance EC2 instance
+    # @param [Fog::Compute::OpenStack::Server] instance OpenStack instance
     def soft_reboot(instance)
       instance.reboot
     end
 
     ##
     # Hard reboots OpenStack instance
-    # @param [AWS::EC2::Instance] instance EC2 instance
+    # @param [Fog::Compute::OpenStack::Server] instance OpenStack instance
     def hard_reboot(instance)
       instance.reboot(type = 'HARD')
     end
