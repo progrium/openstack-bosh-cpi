@@ -1,4 +1,4 @@
-# Copyright (c) 2009-2012 VMware, Inc.
+# Copyright (c) 2012 Piston Cloud Computing, Inc.
 
 ENV["BUNDLE_GEMFILE"] ||= File.expand_path("../../Gemfile", __FILE__)
 
@@ -9,32 +9,27 @@ Bundler.setup(:default, :test)
 require "rspec"
 require "tmpdir"
 
-require "cloud/aws"
+require "cloud/openstack"
 
-class AwsConfig
+class OpenStackConfig
   attr_accessor :db, :logger, :uuid
 end
 
-aws_config = AwsConfig.new
-aws_config.db = nil # AWS CPI doesn't need DB
-aws_config.logger = Logger.new(StringIO.new)
-aws_config.logger.level = Logger::DEBUG
+os_config = OpenStackConfig.new
+os_config.db = nil # OpenStack CPI doesn't need DB
+os_config.logger = Logger.new(StringIO.new)
+os_config.logger.level = Logger::DEBUG
 
-Bosh::Clouds::Config.configure(aws_config)
+Bosh::Clouds::Config.configure(os_config)
 
 MOCK_AWS_ACCESS_KEY_ID = "foo"
 MOCK_AWS_SECRET_ACCESS_KEY = "bar"
 
 def mock_cloud_options
   {
-    "aws" => {
+    "openstack" => {
       "access_key_id" => MOCK_AWS_ACCESS_KEY_ID,
       "secret_access_key" => MOCK_AWS_SECRET_ACCESS_KEY
-    },
-    "registry" => {
-      "endpoint" => "localhost:42288",
-      "user" => "admin",
-      "password" => "admin"
     },
     "agent" => {
       "foo" => "bar",

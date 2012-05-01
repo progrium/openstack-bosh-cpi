@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-# Copyright (c) 2009-2012 VMware, Inc.
+# Copyright (c) 2012 Piston Cloud Computing, Inc.
 
 # Usage example:
 # irb(main):001:0> cpi.create_vm("test", "ami-809a48e9",
@@ -15,7 +15,7 @@ if File.exists?(gemfile)
 end
 
 $:.unshift(File.expand_path("../../lib", __FILE__))
-require "bosh_aws_cpi"
+require "bosh_openstack_cpi"
 require "irb"
 require "irb/completion"
 require "ostruct"
@@ -38,15 +38,11 @@ end
 
 module ConsoleHelpers
   def cpi
-    @cpi ||= Bosh::AwsCloud::Cloud.new(@config)
+    @cpi ||= Bosh::OpenStackCloud::Cloud.new(@config)
   end
 
-  def ec2
-    cpi.ec2
-  end
-
-  def registry
-    cpi.registry
+  def os
+    cpi.os
   end
 end
 
@@ -63,10 +59,7 @@ rescue LoadError
   puts "=> ruby-debug not found, debugger disabled"
 end
 
-puts "=> Welcome to BOSH AWS CPI console"
+puts "=> Welcome to BOSH OpenStack CPI console"
 puts "You can use 'cpi' to access CPI methods"
 
 IRB.start
-
-
-

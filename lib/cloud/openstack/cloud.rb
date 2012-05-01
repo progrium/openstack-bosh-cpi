@@ -3,11 +3,6 @@
 module Bosh::OpenStackCloud
 
   class Cloud < Bosh::Cloud
-    METADATA_TIMEOUT = 5 # seconds
-    DEVICE_POLL_TIMEOUT = 60 # seconds
-
-    DEFAULT_AKI = "aki-825ea7eb"
-
     ##
     # Initialize BOSH OpenStack CPI
     # @param [Hash] options CPI options
@@ -31,12 +26,10 @@ module Bosh::OpenStackCloud
       }
 
       @openstack = Fog::Compute.new(openstack_params)
-
-      @metadata_lock = Mutex.new
     end
 
     ##
-    # Creates EC2 instance and waits until it's in running state
+    # Creates OpenStack instance and waits until it's in running state
     # @param [String] agent_id Agent id associated with new VM
     # @param [String] stemcell_id AMI id that will be used
     #   to power on new instance
@@ -209,92 +202,18 @@ module Bosh::OpenStackCloud
     end
 
     def configure_networks(instance_id, network_spec)
-      with_thread_name("configure_networks(#{instance_id}, ...)") do
-        @logger.info("Configuring `#{instance_id}' to use the following " \
-                     "network settings: #{network_spec.pretty_inspect}")
-
-        network_configurator = NetworkConfigurator.new(network_spec)
-        instance = @ec2.instances[instance_id]
-
-        network_configurator.configure(@ec2, instance)
-
-        update_agent_settings(instance) do |settings|
-          settings["networks"] = network_spec
-        end
-      end
+      not_implemented(:configure_networks)
     end
 
-    ##
-    # Creates a new AMI using stemcell image.
-    # This method can only be run on an EC2 instance, as image creation
-    # involves creating and mounting new EBS volume as local block device.
-    # @param [String] image_path local filesystem path to a stemcell image
-    # @param [Hash] cloud_properties CPI-specific properties
     def create_stemcell(image_path, cloud_properties)
-      # TODO: refactor into several smaller methods
-      with_thread_name("create_stemcell(#{image_path}...)") do
-        begin
-          # These two variables are used in 'ensure' clause
-          instance = nil
-          volume = nil
-          # 1. Create and mount new EBS volume (2GB default)
-          disk_size = cloud_properties["disk"] || 2048
-          volume_id = create_disk(disk_size, current_instance_id)
-          volume = @ec2.volumes[volume_id]
-          instance = @ec2.instances[current_instance_id]
-
-          sd_name = attach_ebs_volume(instance, volume)
-          ebs_volume = find_ebs_device(sd_name)
-
-          # 2. Copy image to new EBS volume
-          Dir.mktmpdir do |tmp_dir|
-            @logger.info("Extracting stemcell to `#{tmp_dir}'")
-
-            unpack_image(tmp_dir, image_path)
-            copy_root_image(tmp_dir, ebs_volume)
-
-            # 3. Create snapshot and then an image using this snapshot
-            snapshot = volume.create_snapshot
-            wait_resource(snapshot, snapshot.status, :completed)
-
-            image_params = {
-              :name => "BOSH-#{generate_unique_name}",
-              :architecture => "x86_64",
-              :kernel_id => cloud_properties["kernel_id"] || DEFAULT_AKI,
-              :root_device_name => "/dev/sda",
-              :block_device_mappings => {
-                "/dev/sda" => { :snapshot_id => snapshot.id },
-                "/dev/sdb" => "ephemeral0"
-              }
-            }
-
-            image = @ec2.images.create(image_params)
-            wait_resource(image, image.state, :available, :state)
-
-            image.id
-          end
-        rescue => e
-          # TODO: delete snapshot?
-          @logger.error(e)
-          raise e
-        ensure
-          if instance && volume
-            detach_ebs_volume(instance, volume)
-            delete_disk(volume.id)
-          end
-        end
-      end
+      not_implemented(:create_stemcell)
     end
 
     def delete_stemcell(stemcell_id)
-      with_thread_name("delete_stemcell(#{stemcell_id})") do
-        image = @ec2.images[stemcell_id]
-        image.deregister
-      end
+      not_implemented(:delete_stemcell)
     end
 
     def validate_deployment(old_manifest, new_manifest)
-      # Not implemented in VSphere CPI as well
       not_implemented(:validate_deployment)
     end
 
@@ -342,34 +261,6 @@ module Bosh::OpenStackCloud
 
     def generate_unique_name
       UUIDTools::UUID.random_create.to_s
-    end
-
-    ##
-    # Reads current instance id from EC2 metadata. We are assuming
-    # instance id cannot change while current process is running
-    # and thus memoizing it.
-    def current_instance_id
-      @metadata_lock.synchronize do
-        return @current_instance_id if @current_instance_id
-
-        client = HTTPClient.new
-        client.connect_timeout = METADATA_TIMEOUT
-        # Using 169.254.169.254 is an EC2 convention for getting
-        # instance metadata
-        uri = "http://169.254.169.254/1.0/meta-data/instance-id/"
-
-        response = client.get(uri)
-        unless response.status == 200
-          cloud_error("Instance metadata endpoint returned " \
-                      "HTTP #{response.status}")
-        end
-
-        @current_instance_id = response.body
-      end
-
-    rescue HTTPClient::TimeoutError
-      cloud_error("Timed out reading instance metadata, " \
-                  "please make sure CPI is running on EC2 instance")
     end
 
     def attach_ebs_volume(instance, volume)
@@ -433,45 +324,6 @@ module Bosh::OpenStackCloud
       end
     end
 
-    def unpack_image(tmp_dir, image_path)
-      output = `tar -C #{tmp_dir} -xzf #{image_path} 2>&1`
-      if $?.exitstatus != 0
-        cloud_error("Failed to unpack stemcell root image" \
-                    "tar exit status #{$?.exitstatus}: #{output}")
-      end
-
-      root_image = File.join(tmp_dir, "root.img")
-      unless File.exists?(root_image)
-        cloud_error("Root image is missing from stemcell archive")
-      end
-    end
-
-    def copy_root_image(dir, ebs_volume)
-      Dir.chdir(dir) do
-        dd_out = `dd if=root.img of=#{ebs_volume} 2>&1`
-        if $?.exitstatus != 0
-          cloud_error("Unable to copy stemcell root image, " \
-                      "dd exit status #{$?.exitstatus}: " \
-                      "#{dd_out}")
-        end
-      end
-    end
-
-    def find_ebs_device(sd_name)
-      xvd_name = sd_name.gsub(/^\/dev\/sd/, "/dev/xvd")
-
-      DEVICE_POLL_TIMEOUT.times do
-        if File.blockdev?(sd_name)
-          return sd_name
-        elsif File.blockdev?(xvd_name)
-          return xvd_name
-        end
-        sleep(1)
-      end
-
-      cloud_error("Cannot find EBS volume on current instance")
-    end
-
     ##
     # Soft reboots OpenStack instance
     # @param [AWS::EC2::Instance] instance EC2 instance
@@ -491,11 +343,13 @@ module Bosh::OpenStackCloud
     # be used to create all required data structures etc.
     #
     def validate_options
-      unless @options.has_key?("aws") &&
-          @options["aws"].is_a?(Hash) &&
-          @options["aws"]["access_key_id"] &&
-          @options["aws"]["secret_access_key"]
-        raise ArgumentError, "Invalid AWS configuration parameters"
+      unless @options.has_key?("openstack") &&
+          @options["openstack"].is_a?(Hash) &&
+          @options["openstack"]["openstack_auth_url"] &&
+          @options["openstack"]["openstack_username"] &&
+          @options["openstack"]["openstack_api_key"] &&
+          @options["openstack"]["openstack_tenant"]
+        raise ArgumentError, "Invalid OpenStack configuration parameters"
       end
     end
 
