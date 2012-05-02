@@ -6,7 +6,7 @@
 # irb(main):001:0> cpi.create_vm("test",
 #                                "natty-server-cloudimg-amd64",
 #                                {"instance_type" => "m1.tiny"},
-#                                {"default" => {"type" => "dynamic", "cloud_properties" => {"security_groups" => ["default"]}}},
+#                                {"default" => {"type" => "dynamic", "cloud_properties" => {"security_groups" => ["name" => "default"]}}},
 #                                [],
 #                                {"foo" =>"bar"})
 

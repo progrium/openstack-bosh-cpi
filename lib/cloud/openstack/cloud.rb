@@ -39,8 +39,7 @@ module Bosh::OpenStackCloud
         :openstack_auth_url => @openstack_properties["auth_url"],
         :openstack_username => @openstack_properties["username"],
         :openstack_api_key => @openstack_properties["api_key"],
-        :openstack_tenant => @openstack_properties["tenant"],
-        #:logger => @openstack_logger
+        :openstack_tenant => @openstack_properties["tenant"]
       }
 
       registry_endpoint = @registry_properties["endpoint"]
@@ -142,6 +141,7 @@ module Bosh::OpenStackCloud
 
         @logger.info("Updating server settings for `#{server.id}'")
         settings = initial_agent_settings(agent_id, network_spec, environment)
+        # TODO uncomment to test registry
         #@registry.update_settings(server.id, settings)
 
         server.id
@@ -162,6 +162,7 @@ module Bosh::OpenStackCloud
         wait_resource(@openstack.servers, server_id, state, :terminated)
 
         @logger.info("Deleting server settings for `#{server.id}'")
+        # TODO uncomment to test registry
         #@registry.delete_settings(server.id)
       end
     end
@@ -182,9 +183,9 @@ module Bosh::OpenStackCloud
                      "network settings: #{network_spec.pretty_inspect}")
 
         network_configurator = NetworkConfigurator.new(network_spec)
-        server = @client.get_server_details[instance_id]
+        server = @openstack.servers.get(server_id)
 
-        network_configurator.configure(@client, server)
+        network_configurator.configure(@openstack, server)
 
         update_agent_settings(server) do |settings|
           settings["networks"] = network_spec
@@ -261,10 +262,10 @@ module Bosh::OpenStackCloud
 
     def attach_disk(server_id, disk_id)
       with_thread_name("attach_disk(#{server_id}, #{disk_id})") do
-        server = @openstack.instances[instance_id]
+        server = @openstack.servers.get(server_id)
         volume = @openstack.volumes.get(disk_id)
 
-        device_name = attach_volume(server_id, disk_id)
+        device_name = attach_volume(server, volume)
 
         update_agent_settings(instance) do |settings|
           settings["disks"] ||= {}
@@ -276,7 +277,7 @@ module Bosh::OpenStackCloud
 
     def detach_disk(server_id, disk_id)
       with_thread_name("detach_disk(#{server_id}, #{disk_id})") do
-        instance = @ec2.instances[server_id]
+        server = @openstack.servers.get(server_id)
         volume = @openstack.volumes.get(disk_id)
 
         update_agent_settings(instance) do |settings|
@@ -285,7 +286,7 @@ module Bosh::OpenStackCloud
           settings["disks"]["persistent"].delete(disk_id)
         end
 
-        detach_ebs_volume(server_id, disk_id)
+        detach_volume(server, volume)
 
         @logger.info("Detached `#{disk_id}' from `#{server_id}'")
       end
@@ -294,7 +295,7 @@ module Bosh::OpenStackCloud
 
 
     ##
-    # Creates a new AMI using stemcell image.
+    # Creates a new OpenStack Image using stemcell image.
     # This method can only be run on an EC2 instance, as image creation
     # involves creating and mounting new EBS volume as local block device.
     # @param [String] image_path local filesystem path to a stemcell image
@@ -357,13 +358,12 @@ module Bosh::OpenStackCloud
 
     def delete_stemcell(stemcell_id)
       with_thread_name("delete_stemcell(#{stemcell_id})") do
-        image = @cs.get_image[stemcell_id]
-        image.delete!
+        image = @openstack.images.get(stemcell_id)
+        image.destroy
       end
     end
 
     def validate_deployment(old_manifest, new_manifest)
-      # Not implemented in VSphere CPI as well
       not_implemented(:validate_deployment)
     end
 
@@ -406,9 +406,10 @@ module Bosh::OpenStackCloud
         raise ArgumentError, "block is not provided"
       end
 
-      settings = @registry.read_settings(server.id)
-      yield settings
-      @registry.update_settings(server.id, settings)
+      # TODO uncomment to test registry
+      #settings = @registry.read_settings(server.id)
+      #yield settings
+      #@registry.update_settings(server.id, settings)
     end
 
     def generate_unique_name
@@ -443,7 +444,7 @@ module Bosh::OpenStackCloud
                   "please make sure CPI is running on EC2 instance")
     end
 
-    def attach_ebs_volume(server, volume)
+    def attach_volume(server, volume)
       device_names = Set.new(server.get_server_volumes.keys)
       new_attachment = nil
 
@@ -478,7 +479,7 @@ module Bosh::OpenStackCloud
       device_name
     end
 
-    def detach_ebs_volume(server, volume)
+    def detach_volume(server, volume)
       mappings = server.get_server_volumes
 
       device_map = mappings.inject({}) do |hash, (device_name, attachment)|

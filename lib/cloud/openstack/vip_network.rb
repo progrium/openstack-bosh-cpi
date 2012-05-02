@@ -31,7 +31,7 @@ module Bosh::OpenStackCloud
       # if it is associated to any server, so we can disassociate it
       # before associating it to the new server.
       address_id = nil
-      addresses = @openstack.addresses
+      addresses = openstack.addresses
       addresses.each do |address|
         if address.ip == @ip
           address.disassociate unless address.instance_id.nil?
