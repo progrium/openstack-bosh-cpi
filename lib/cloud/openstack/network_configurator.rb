@@ -66,12 +66,13 @@ module Bosh::OpenStackCloud
       else
         # If there is no vip network we should disassociate any floating IP
         # currently held by server (as it might have had floating IP before)
-        floating_ip = openstack.list_public_addresses(server.id) # TODO FRB
-
-        if floating_ip
-          @logger.info("Disassociating floating IP `#{floating_ip}' " \
-                       "from server `#{server.id}'")
-          server.disassociate_address(floating_ip)
+        addresses = @openstack.addresses
+        addresses.each do |address|
+          if address.instance_id == server.id
+            @logger.info("Disassociating floating IP `#{address.ip}' " \
+                         "from server `#{server.id}'")
+            address.disassociate
+          end
         end
       end
     end

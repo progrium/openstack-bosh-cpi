@@ -27,13 +27,22 @@ module Bosh::OpenStackCloud
       @logger.info("Associating instance `#{server.id}' " \
                    "with floating IP `#{@ip}'")
 
-      # New floating IP reservation supposed to clear the old one,
-      # so no need to disassociate manually. Also, we don't check
-      # if this IP is actually an allocated OpenStack floating IP, as
-      # API call will fail in that case.
-      # TODO: wrap error for non-existing floating IP?
-      # TODO: poll instance until this IP is returned as its public IP?
-      server.associate_address(@ip)
+      # Check if the OpenStack floating IP is allocated. If true, check
+      # if it is associated to any server, so we can disassociate it
+      # before associating it to the new server.
+      address_id = nil
+      addresses = @openstack.addresses
+      addresses.each do |address|
+        if address.ip == @ip
+          address.disassociate unless address.instance_id.nil?
+          address.associate(server)
+          address_id = address.id
+          break
+        end
+      end
+      if address_id.nil?
+        cloud_error("OpenStack CPI: floating IP #{@ip} not allocated")
+      end
     end
 
   end

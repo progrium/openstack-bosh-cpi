@@ -1,4 +1,4 @@
-# Copyright (c) 2009-2012 VMware, Inc.
+# Copyright (c) 2012 Piston Cloud Computing, Inc.
 
 $:.unshift(File.expand_path("../../rake", __FILE__))
 
