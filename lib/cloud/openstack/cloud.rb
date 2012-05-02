@@ -35,7 +35,7 @@ module Bosh::OpenStackCloud
       @default_security_groups = @openstack_properties["default_security_groups"]
 
       openstack_params = {
-        :provider => 'OpenStack',
+        :provider => "OpenStack",
         :openstack_auth_url => @openstack_properties["auth_url"],
         :openstack_username => @openstack_properties["username"],
         :openstack_api_key => @openstack_properties["api_key"],
