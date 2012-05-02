@@ -18,7 +18,13 @@ require "common/thread_formatter"
 require "cloud"
 require "cloud/openstack/helpers"
 require "cloud/openstack/cloud"
+require "cloud/openstack/registry_client"
 require "cloud/openstack/version"
+
+require "cloud/openstack/network_configurator"
+require "cloud/openstack/network"
+require "cloud/openstack/dynamic_network"
+require "cloud/openstack/vip_network"
 
 module Bosh
   module Clouds

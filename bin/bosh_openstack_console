@@ -3,8 +3,12 @@
 # Copyright (c) 2012 Piston Cloud Computing, Inc.
 
 # Usage example:
-# irb(main):001:0> cpi.create_vm("test", "ami-809a48e9",
-#                  {"instance_type" => "m1.small"}, {}, [], {"foo" =>"bar"})
+# irb(main):001:0> cpi.create_vm("test",
+#                                "natty-server-cloudimg-amd64",
+#                                {"instance_type" => "m1.tiny"},
+#                                {"default" => {"type" => "dynamic", "cloud_properties" => {"security_groups" => ["default"]}}},
+#                                [],
+#                                {"foo" =>"bar"})
 
 gemfile = File.expand_path("../../Gemfile", __FILE__)
 
@@ -41,8 +45,12 @@ module ConsoleHelpers
     @cpi ||= Bosh::OpenStackCloud::Cloud.new(@config)
   end
 
-  def os
-    cpi.os
+  def openstack
+    cpi.openstack
+  end
+
+  def registry
+    cpi.registry
   end
 end
 
@@ -61,5 +69,6 @@ end
 
 puts "=> Welcome to BOSH OpenStack CPI console"
 puts "You can use 'cpi' to access CPI methods"
+puts "You can use 'openstack' to access Fog::Compute::OpenStack methods"
 
 IRB.start
