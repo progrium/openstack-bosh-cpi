@@ -19,10 +19,10 @@ module Bosh::OpenStackCloud
 
       openstack_params = {
         :provider => "OpenStack",
-        :openstack_auth_url => @openstack_properties["openstack_auth_url"],
-        :openstack_username => @openstack_properties["openstack_username"],
-        :openstack_api_key => @openstack_properties["openstack_api_key"],
-        :openstack_tenant => @openstack_properties["openstack_tenant"]
+        :openstack_auth_url => @openstack_properties["auth_url"],
+        :openstack_username => @openstack_properties["username"],
+        :openstack_api_key => @openstack_properties["api_key"],
+        :openstack_tenant => @openstack_properties["tenant"]
       }
 
       @os = Fog::Compute.new(openstack_params)
@@ -271,10 +271,10 @@ module Bosh::OpenStackCloud
     def validate_options
       unless @options.has_key?("openstack") &&
           @options["openstack"].is_a?(Hash) &&
-          @options["openstack"]["openstack_auth_url"] &&
-          @options["openstack"]["openstack_username"] &&
-          @options["openstack"]["openstack_api_key"] &&
-          @options["openstack"]["openstack_tenant"]
+          @options["openstack"]["auth_url"] &&
+          @options["openstack"]["username"] &&
+          @options["openstack"]["api_key"] &&
+          @options["openstack"]["tenant"]
         raise ArgumentError, "Invalid OpenStack configuration parameters"
       end
     end
