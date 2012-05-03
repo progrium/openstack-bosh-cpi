@@ -36,13 +36,13 @@ module Bosh::OpenStackCloud
     # Creates an OpenStack server and waits until it's in running state
     # @param [String] agent_id Agent id associated with new VM
     # @param [String] stemcell_id AMI id that will be used
-    #   to power on new instance
+    #   to power on new server
     # @param [Hash] resource_pool Resource pool specification
     # @param [Hash] network_spec Network specification, if it contains
     #  security groups they must be existing
     # @param [optional, Array] disk_locality List of disks that
-    #   might be attached to this instance in the future, can be
-    #   used as a placement hint (i.e. instance will only be created
+    #   might be attached to this server in the future, can be
+    #   used as a placement hint (i.e. server will only be created
     #   if resource pool availability zone is the same as disk
     #   availability zone)
     # @param [optional, Hash] environment Data to be merged into
@@ -106,11 +106,11 @@ module Bosh::OpenStackCloud
     ##
     # Creates a new OpenStack volume
     # @param [Integer] size disk size in MiB
-    # @param [optional, String] instance_id vm id
+    # @param [optional, String] server_id vm id
     #        of the VM that this disk will be attached to
     # @return [String] created OpenStack volume id
-    def create_disk(size, instance_id = nil)
-      with_thread_name("create_disk(#{size}, #{instance_id})") do
+    def create_disk(size, server_id = nil)
+      with_thread_name("create_disk(#{size}, #{server_id})") do
         unless size.kind_of?(Integer)
           raise ArgumentError, "disk size needs to be an integer"
         end
@@ -160,14 +160,14 @@ module Bosh::OpenStackCloud
       end
     end
 
-    def attach_disk(instance_id, disk_id)
-      with_thread_name("attach_disk(#{instance_id}, #{disk_id})") do
-        instance = @openstack.servers[instance_id]
+    def attach_disk(server_id, disk_id)
+      with_thread_name("attach_disk(#{server_id}, #{disk_id})") do
+        server = @openstack.servers[server_id]
         volume = @openstack.volumes[disk_id]
 
-        device_name = instance.attach_volume(volume.id, instance.id, disk_id)
+        device_name = server.attach_volume(volume.id, server_id, disk_id)
 
-        update_agent_settings(instance) do |settings|
+        update_agent_settings(server) do |settings|
           settings["disks"] ||= {}
           settings["disks"]["persistent"] ||= {}
           settings["disks"]["persistent"][disk_id] = device_name
@@ -192,7 +192,7 @@ module Bosh::OpenStackCloud
       end
     end
 
-    def configure_networks(instance_id, network_spec)
+    def configure_networks(server_id, network_spec)
       not_implemented(:configure_networks)
     end
 
@@ -212,7 +212,7 @@ module Bosh::OpenStackCloud
 
     ##
     # Generates initial agent settings. These settings will be read by agent
-    # from the OS API on a target instance. Disk conventions are:
+    # from the OS API on a target server. Disk conventions are:
     # system disk: /dev/sda
     # ephemeral disk: /dev/sdb
     # Volumes can be configured to map to other device names later (sdf
@@ -241,12 +241,12 @@ module Bosh::OpenStackCloud
       settings.merge(@agent_properties)
     end
 
-    def update_agent_settings(instance)
+    def update_agent_settings(server)
       unless block_given?
         raise ArgumentError, "block is not provided"
       end
 
-      settings = @openstack.server(instance.id)
+      settings = @openstack.server(server.id)
       yield settings
     end
 

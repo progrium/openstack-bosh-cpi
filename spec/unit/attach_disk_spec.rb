@@ -4,22 +4,23 @@ require File.expand_path("../../spec_helper", __FILE__)
 
 describe Bosh::OpenStackCloud::Cloud do
 
-  it "attaches OpenStack volume to an instance" do
-    instance = double("instance", :id => "i-test")
+  it "attaches OpenStack volume to a server" do
+    server = double("server", :id => "i-test")
     volume = double("volume", :id => "v-foobar")
     attachment = double("attachment", :device => "/dev/sdf")
 
     cloud = mock_cloud do |openstack|
-      openstack.servers.should_receive(:[]).with("i-test").and_return(instance)
+      openstack.servers.should_receive(:[]).with("i-test").and_return(server)
       openstack.volumes.should_receive(:[]).with("v-foobar").and_return(volume)
     end
 
-    volume.should_receive(:attach_to).
-      with(instance, "/dev/sdf").and_return(attachment)
+    volume.should_receive(:attach_to).with(server, "/dev/sdf").and_return(attachment)
 
-    instance.should_receive(:block_device_mappings).and_return({})
+    server.should_receive(:block_device_mappings).and_return({})
+    server.should_receive(:attach_volume).and_return("v-foobar", "i-test", "v-foobar")
 
     attachment.should_receive(:status).and_return(:attaching)
+
     cloud.should_receive(:wait_resource).with(attachment, :attaching, :attached)
 
     old_settings = { "foo" => "bar" }
@@ -36,22 +37,22 @@ describe Bosh::OpenStackCloud::Cloud do
   end
 
   it "picks available device name" do
-    instance = double("instance", :id => "i-test")
+    server = double("server", :id => "i-test")
     volume = double("volume", :id => "v-foobar")
     attachment = double("attachment", :device => "/dev/sdh")
 
     cloud = mock_cloud do |openstack|
-      openstack.servers.should_receive(:[]).with("i-test").and_return(instance)
+      openstack.servers.should_receive(:[]).with("i-test").and_return(server)
       openstack.volumes.should_receive(:[]).with("v-foobar").and_return(volume)
     end
 
-    instance.should_receive(:block_device_mappings).
-      and_return({ "/dev/sdf" => "foo", "/dev/sdg" => "bar" })
+    server.should_receive(:block_device_mappings).and_return({ "/dev/sdf" => "foo", "/dev/sdg" => "bar" })
+    server.should_receive(:attach_volume).and_return("v-foobar", "i-test", "v-foobar")
 
-    volume.should_receive(:attach_to).
-      with(instance, "/dev/sdh").and_return(attachment)
+    volume.should_receive(:attach_to).with(server, "/dev/sdh").and_return(attachment)
 
     attachment.should_receive(:status).and_return(:attaching)
+
     cloud.should_receive(:wait_resource).with(attachment, :attaching, :attached)
 
     old_settings = { "foo" => "bar" }
@@ -68,22 +69,22 @@ describe Bosh::OpenStackCloud::Cloud do
   end
 
   it "picks available device name" do
-    instance = double("instance", :id => "i-test")
+    server = double("server", :id => "i-test")
     volume = double("volume", :id => "v-foobar")
     attachment = double("attachment", :device => "/dev/sdh")
 
     cloud = mock_cloud do |openstack|
-      openstack.servers.should_receive(:[]).with("i-test").and_return(instance)
+      openstack.servers.should_receive(:[]).with("i-test").and_return(server)
       openstack.volumes.should_receive(:[]).with("v-foobar").and_return(volume)
     end
 
-    instance.should_receive(:block_device_mappings).
-      and_return({ "/dev/sdf" => "foo", "/dev/sdg" => "bar" })
+    server.should_receive(:block_device_mappings).and_return({ "/dev/sdf" => "foo", "/dev/sdg" => "bar" })
+    server.should_receive(:attach_volume).and_return("v-foobar", "i-test", "v-foobar")
 
-    volume.should_receive(:attach_to).
-      with(instance, "/dev/sdh").and_return(attachment)
+    volume.should_receive(:attach_to).with(server, "/dev/sdh").and_return(attachment)
 
     attachment.should_receive(:status).and_return(:attaching)
+
     cloud.should_receive(:wait_resource).with(attachment, :attaching, :attached)
 
     old_settings = { "foo" => "bar" }
@@ -100,11 +101,11 @@ describe Bosh::OpenStackCloud::Cloud do
   end
 
   it "raises an error when sdf..sdp are all reserved" do
-    instance = double("instance", :id => "i-test")
+    server = double("server", :id => "i-test")
     volume = double("volume", :id => "v-foobar")
 
     cloud = mock_cloud do |openstack|
-      openstack.servers.should_receive(:[]).with("i-test").and_return(instance)
+      openstack.servers.should_receive(:[]).with("i-test").and_return(server)
       openstack.volumes.should_receive(:[]).with("v-foobar").and_return(volume)
     end
 
@@ -113,8 +114,8 @@ describe Bosh::OpenStackCloud::Cloud do
       hash
     end
 
-    instance.should_receive(:block_device_mappings).
-      and_return(all_mappings)
+    server.should_receive(:block_device_mappings).and_return(all_mappings)
+    server.should_receive(:attach_volume).and_return("v-foobar", "i-test", "v-foobar")
 
     expect {
       cloud.attach_disk("i-test", "v-foobar")

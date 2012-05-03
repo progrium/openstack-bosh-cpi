@@ -12,10 +12,11 @@ describe Bosh::OpenStackCloud::Cloud do
     volume = double("volume", :id => "v-foobar")
 
     cloud = mock_cloud do |openstack|
-      openstack.volumes.should_receive(:create).with(disk_params).and_return(volume)
+      openstack.volumes.should_receive(:create_volume).with(disk_params).and_return(volume)
     end
 
     volume.should_receive(:state).and_return(:creating)
+
     cloud.should_receive(:wait_resource).with(volume, :creating, :available)
 
     cloud.create_disk(2048).should == "v-foobar"
@@ -29,10 +30,11 @@ describe Bosh::OpenStackCloud::Cloud do
     volume = double("volume", :id => "v-foobar")
 
     cloud = mock_cloud do |openstack|
-      openstack.volumes.should_receive(:create).with(disk_params).and_return(volume)
+      openstack.volumes.should_receive(:create_volume).with(disk_params).and_return(volume)
     end
 
     volume.should_receive(:state).and_return(:creating)
+
     cloud.should_receive(:wait_resource).with(volume, :creating, :available)
 
     cloud.create_disk(2049)

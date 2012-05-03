@@ -15,15 +15,16 @@ describe Bosh::OpenStackCloud::Cloud do
     end
 
     mappings = {
-      "/dev/sdf" => mock("attachment",
-                         :volume => mock("volume", :id => "v-foobar")),
-      "/dev/sdg" => mock("attachment",
-                         :volume => mock("volume", :id => "v-deadbeef")),
+      "/dev/sdf" => mock("attachment", :volume => mock("volume", :id => "v-foobar")),
+      "/dev/sdg" => mock("attachment", :volume => mock("volume", :id => "v-deadbeef"))
     }
 
     server.should_receive(:block_device_mappings).and_return(mappings)
+
     volume.should_receive(:detach_from).with(server, "/dev/sdf").and_return(attachment)
+
     attachment.should_receive(:status).and_return(:detaching)
+
     cloud.should_receive(:wait_resource).with(attachment, :detaching, :detached)
 
     old_settings = {

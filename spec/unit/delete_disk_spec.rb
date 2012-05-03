@@ -12,7 +12,8 @@ describe Bosh::OpenStackCloud::Cloud do
     end
 
     volume.should_receive(:state).and_return(:available, :deleting)
-    volume.should_receive(:delete)
+    volume.should_receive(:delete_volume)
+
     cloud.should_receive(:wait_resource).with(volume, :deleting, :deleted)
 
     cloud.delete_disk("v-foo")

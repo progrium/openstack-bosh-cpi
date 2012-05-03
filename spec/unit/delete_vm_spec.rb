@@ -11,9 +11,10 @@ describe Bosh::OpenStackCloud::Cloud do
       openstack.servers.stub(:[]).with("i-foobar").and_return(server)
     end
 
-    server.should_receive(:terminate)
-    server.should_receive(:status).and_return(:deleting)
-    cloud.should_receive(:wait_resource).with(server, :deleting, :terminated)
+    server.should_receive(:destroy)
+    server.should_receive(:state)
+
+    cloud.should_receive(:wait_resource).with(server, nil, :deleted)
 
     cloud.delete_vm("i-foobar")
   end
