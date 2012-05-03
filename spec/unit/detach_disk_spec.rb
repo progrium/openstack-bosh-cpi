@@ -4,13 +4,13 @@ require File.expand_path("../../spec_helper", __FILE__)
 
 describe Bosh::OpenStackCloud::Cloud do
 
-  it "detaches OpenStack volume from an instance" do
-    instance = double("instance", :id => "i-test")
+  it "detaches OpenStack volume from a server" do
+    server = double("server", :id => "i-test")
     volume = double("volume", :id => "v-foobar")
     attachment = double("attachment", :device => "/dev/sdf")
 
     cloud = mock_cloud do |openstack|
-      openstack.instances.should_receive(:[]).with("i-test").and_return(instance)
+      openstack.servers.should_receive(:[]).with("i-test").and_return(server)
       openstack.volumes.should_receive(:[]).with("v-foobar").and_return(volume)
     end
 
@@ -21,11 +21,8 @@ describe Bosh::OpenStackCloud::Cloud do
                          :volume => mock("volume", :id => "v-deadbeef")),
     }
 
-    instance.should_receive(:block_device_mappings).and_return(mappings)
-
-    volume.should_receive(:detach_from).
-      with(instance, "/dev/sdf").and_return(attachment)
-
+    server.should_receive(:block_device_mappings).and_return(mappings)
+    volume.should_receive(:detach_from).with(server, "/dev/sdf").and_return(attachment)
     attachment.should_receive(:status).and_return(:detaching)
     cloud.should_receive(:wait_resource).with(attachment, :detaching, :detached)
 

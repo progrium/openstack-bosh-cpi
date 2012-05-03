@@ -4,7 +4,7 @@ require File.expand_path("../../spec_helper", __FILE__)
 
 describe Bosh::OpenStackCloud::Cloud, "create_vm" do
 
-  def agent_settings(unique_name, network_spec=dynamic_network_spec)
+  def agent_settings(unique_name, network_spec = nil)
     {
       "vm" => {
         "name" => "vm-#{unique_name}"
@@ -24,37 +24,26 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
     }
   end
 
-  def openstack_params(user_data, security_groups=[])
-    {
-      :image_id => "sc-id",
-      :instance_type => "m3.zb",
-      :user_data => Yajl::Encoder.encode(user_data),
-    }
+  def openstack_params()
+    {  :image_id => "bar", :flavor_id => nil }
   end
 
-  it "creates OpenStack instance and polls until it's ready" do
+  it "creates OpenStack server and polls until it's ready" do
     unique_name = UUIDTools::UUID.random_create.to_s
 
-    user_data = {}
-
-    instance = double("instance",
-                      :id => "i-test")
+    server = double("server", :id => "i-test")
 
     cloud = mock_cloud do |openstack|
-      openstack.instances.should_receive(:create).
-        with(openstack_params(user_data)).
-        and_return(instance)
+      openstack.servers.should_receive(:create).
+        with(openstack_params()).
+        and_return(server)
     end
 
-    instance.should_receive(:status).and_return(:pending)
+    server.should_receive(:state).and_return(:building)
     cloud.should_receive(:generate_unique_name).and_return(unique_name)
-    cloud.should_receive(:wait_resource).with(instance, :pending, :running)
+    cloud.should_receive(:wait_resource).with(server, :building, :running)
 
-    vm_id = cloud.create_vm("agent-id", "sc-id",
-                            resource_pool_spec,
-                            { "network_a" => dynamic_network_spec },
-                            nil, { "test_env" => "value" })
-
+    vm_id = cloud.create_vm("foo", "bar", {}, nil)
     vm_id.should == "i-test"
   end
 

@@ -33,7 +33,7 @@ module Bosh::OpenStackCloud
     end
 
     ##
-    # Creates OpenStack instance and waits until it's in running state
+    # Creates an OpenStack server and waits until it's in running state
     # @param [String] agent_id Agent id associated with new VM
     # @param [String] stemcell_id AMI id that will be used
     #   to power on new instance
@@ -48,31 +48,31 @@ module Bosh::OpenStackCloud
     # @param [optional, Hash] environment Data to be merged into
     #   agent settings
     #
-    # @return [String] created instance id
+    # @return [String] created server id
     def create_vm(agent_id, stemcell_id, resource_pool,
-                  network_spec, disk_locality = nil, environment = nil)
+                  network_spec = nil, disk_locality = nil, environment = nil)
       with_thread_name("create_vm(#{agent_id}, ...)") do
         if disk_locality
           @logger.debug("Disk locality is ignored by OpenStack CPI")
         end
 
-        instance_params = {
+        server_params = {
           :image_id => stemcell_id,
-          :flavor_id => resource_pool["instance_type"],
+          :flavor_id => resource_pool["flavor_id"],
         }
 
-        @logger.info("Creating new instance...")
-        instance = @openstack.servers.create(instance_params)
-        state = instance.state
+        @logger.info("Creating new server...")
+        server = @openstack.servers.create(server_params)
+        state = server.state
 
-        @logger.info("Creating new instance `#{instance.id}', " \
+        @logger.info("Creating new server `#{server.id}', " \
                      "state is `#{state}'")
 
-        wait_resource(instance, state, :running)
+        wait_resource(server, state, :running)
 
         settings = initial_agent_settings(agent_id, network_spec, environment)
 
-        instance.id
+        server.id
       end
     end
 
@@ -175,20 +175,20 @@ module Bosh::OpenStackCloud
       end
     end
 
-    def detach_disk(instance_id, disk_id)
-      with_thread_name("detach_disk(#{instance_id}, #{disk_id})") do
-        instance = @openstack.servers[instance_id]
+    def detach_disk(server_id, disk_id)
+      with_thread_name("detach_disk(#{server_id}, #{disk_id})") do
+        server = @openstack.servers[server_id]
         volume = @openstack.volumes[disk_id]
 
-        update_agent_settings(instance) do |settings|
+        update_agent_settings(server) do |settings|
           settings["disks"] ||= {}
           settings["disks"]["persistent"] ||= {}
           settings["disks"]["persistent"].delete(disk_id)
         end
 
-        instance.detach_volume(instance.id, volume.id)
+        server.detach_volume(server_id, volume.id)
 
-        @logger.info("Detached `#{disk_id}' from `#{instance_id}'")
+        @logger.info("Detached `#{disk_id}' from `#{server_id}'")
       end
     end
 
