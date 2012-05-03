@@ -7,7 +7,6 @@ describe Bosh::OpenStackCloud::Cloud do
   it "creates an OpenStack volume" do
     disk_params = {
       :size => 2,
-      :availability_zone => "us-east-1a"
     }
 
     volume = double("volume", :id => "v-foobar")
@@ -25,7 +24,6 @@ describe Bosh::OpenStackCloud::Cloud do
   it "rounds up disk size" do
     disk_params = {
       :size => 3,
-      :availability_zone => "us-east-1a"
     }
 
     volume = double("volume", :id => "v-foobar")
@@ -38,16 +36,6 @@ describe Bosh::OpenStackCloud::Cloud do
     cloud.should_receive(:wait_resource).with(volume, :creating, :available)
 
     cloud.create_disk(2049)
-  end
-
-  it "check min and max disk size" do
-    expect {
-      mock_cloud.create_disk(100)
-    }.to raise_error(Bosh::Clouds::CloudError, /minimum disk size is 1 GiB/)
-
-    expect {
-      mock_cloud.create_disk(2000 * 1024)
-    }.to raise_error(Bosh::Clouds::CloudError, /maximum disk size is 1 TiB/)
   end
 
 end

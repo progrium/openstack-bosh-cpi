@@ -4,16 +4,16 @@ require File.expand_path("../../spec_helper", __FILE__)
 
 describe Bosh::OpenStackCloud::Cloud do
 
-  it "deletes an OpenStack instance" do
-    instance = double("instance", :id => "i-foobar")
+  it "deletes an OpenStack server" do
+    server = double("server", :id => "i-foobar")
 
     cloud = mock_cloud do |openstack|
-      openstack.instances.stub(:[]).with("i-foobar").and_return(instance)
+      openstack.servers.stub(:[]).with("i-foobar").and_return(server)
     end
 
-    instance.should_receive(:terminate)
-    instance.should_receive(:status).and_return(:deleting)
-    cloud.should_receive(:wait_resource).with(instance, :deleting, :terminated)
+    server.should_receive(:terminate)
+    server.should_receive(:status).and_return(:deleting)
+    cloud.should_receive(:wait_resource).with(server, :deleting, :terminated)
 
     cloud.delete_vm("i-foobar")
   end

@@ -5,26 +5,26 @@ require File.expand_path("../../spec_helper", __FILE__)
 describe Bosh::OpenStackCloud::Cloud do
 
   before :each do
-    @instance = double("instance", :id => "i-foobar")
+    @server = double("server", :id => "i-foobar")
 
     @cloud = mock_cloud(mock_cloud_options) do |openstack|
-      openstack.instances.stub(:[]).with("i-foobar").and_return(@instance)
+      openstack.servers.stub(:[]).with("i-foobar").and_return(@server)
     end
   end
 
-  it "reboots an OpenStack instance (CPI call picks soft reboot)" do
-    @cloud.should_receive(:soft_reboot).with(@instance)
+  it "reboots an OpenStack server (CPI call picks soft reboot)" do
+    @cloud.should_receive(:soft_reboot).with(@server)
     @cloud.reboot_vm("i-foobar")
   end
 
-  it "soft reboots an OpenStack instance" do
-    @instance.should_receive(:reboot)
-    @cloud.send(:soft_reboot, @instance)
+  it "soft reboots an OpenStack server" do
+    @server.should_receive(:reboot)
+    @cloud.send(:soft_reboot, @server)
   end
 
-  it "hard reboots an OpenStack instance" do
-    @instance.should_receive(:reboot)
-    @cloud.send(:hard_reboot, @instance)
+  it "hard reboots an OpenStack server" do
+    @server.should_receive(:reboot)
+    @cloud.send(:hard_reboot, @server)
   end
 
 end

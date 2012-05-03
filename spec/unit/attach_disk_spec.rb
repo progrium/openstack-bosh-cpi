@@ -10,7 +10,7 @@ describe Bosh::OpenStackCloud::Cloud do
     attachment = double("attachment", :device => "/dev/sdf")
 
     cloud = mock_cloud do |openstack|
-      openstack.instances.should_receive(:[]).with("i-test").and_return(instance)
+      openstack.servers.should_receive(:[]).with("i-test").and_return(instance)
       openstack.volumes.should_receive(:[]).with("v-foobar").and_return(volume)
     end
 
@@ -41,7 +41,7 @@ describe Bosh::OpenStackCloud::Cloud do
     attachment = double("attachment", :device => "/dev/sdh")
 
     cloud = mock_cloud do |openstack|
-      openstack.instances.should_receive(:[]).with("i-test").and_return(instance)
+      openstack.servers.should_receive(:[]).with("i-test").and_return(instance)
       openstack.volumes.should_receive(:[]).with("v-foobar").and_return(volume)
     end
 
@@ -73,7 +73,7 @@ describe Bosh::OpenStackCloud::Cloud do
     attachment = double("attachment", :device => "/dev/sdh")
 
     cloud = mock_cloud do |openstack|
-      openstack.instances.should_receive(:[]).with("i-test").and_return(instance)
+      openstack.servers.should_receive(:[]).with("i-test").and_return(instance)
       openstack.volumes.should_receive(:[]).with("v-foobar").and_return(volume)
     end
 
@@ -104,7 +104,7 @@ describe Bosh::OpenStackCloud::Cloud do
     volume = double("volume", :id => "v-foobar")
 
     cloud = mock_cloud do |openstack|
-      openstack.instances.should_receive(:[]).with("i-test").and_return(instance)
+      openstack.servers.should_receive(:[]).with("i-test").and_return(instance)
       openstack.volumes.should_receive(:[]).with("v-foobar").and_return(volume)
     end
 

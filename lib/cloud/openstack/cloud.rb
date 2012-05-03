@@ -77,29 +77,29 @@ module Bosh::OpenStackCloud
     end
 
     ##
-    # Terminates OpenStack instance and waits until it reports as terminated
-    # @param [String] vm_id Running instance id
-    def delete_vm(instance_id)
-      with_thread_name("delete_vm(#{instance_id})") do
-        instance = @openstack.instances[instance_id]
+    # Terminates OpenStack server and waits until it reports as terminated
+    # @param [String] vm_id Running server id
+    def delete_vm(server_id)
+      with_thread_name("delete_vm(#{server_id})") do
+        server = @openstack.servers[server_id]
 
-        instance.destroy
-        state = instance.state
+        server.destroy
+        state = server.state
 
-        @logger.info("Deleting instance `#{instance.id}', " \
+        @logger.info("Deleting server `#{server.id}', " \
                      "state is `#{state}'")
 
-        wait_resource(instance, state, :deleted)
+        wait_resource(server, state, :deleted)
       end
     end
 
     ##
-    # Reboots OpenStack instance
-    # @param [String] instance_id Running instance id
-    def reboot_vm(instance_id)
-      with_thread_name("reboot_vm(#{instance_id})") do
-        instance = @openstack.instances[instance_id]
-        soft_reboot(instance)
+    # Reboots OpenStack server
+    # @param [String] server_id Running server id
+    def reboot_vm(server_id)
+      with_thread_name("reboot_vm(#{server_id})") do
+        server = @openstack.servers[server_id]
+        soft_reboot(server)
       end
     end
 
@@ -255,17 +255,17 @@ module Bosh::OpenStackCloud
     end
 
     ##
-    # Soft reboots OpenStack instance
-    # @param [Fog::Compute::OpenStack::Server] instance OpenStack instance
-    def soft_reboot(instance)
-      instance.reboot
+    # Soft reboots OpenStack server
+    # @param [Fog::Compute::OpenStack::Server] OpenStack server
+    def soft_reboot(server)
+      server.reboot
     end
 
     ##
-    # Hard reboots OpenStack instance
-    # @param [Fog::Compute::OpenStack::Server] instance OpenStack instance
-    def hard_reboot(instance)
-      instance.reboot(type = 'HARD')
+    # Hard reboots OpenStack server
+    # @param [Fog::Compute::OpenStack::Server] OpenStack server
+    def hard_reboot(server)
+      server.reboot(type = 'HARD')
     end
 
     ##
