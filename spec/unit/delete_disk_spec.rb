@@ -8,7 +8,7 @@ describe Bosh::OpenStackCloud::Cloud do
     volume = double("volume", :id => "v-foo")
 
     cloud = mock_cloud do |openstack|
-      openstack.volumes.stub(:[]).with("v-foo").and_return(volume)
+      openstack.volumes.stub(:get).with("v-foo").and_return(volume)
     end
 
     volume.should_receive(:state).and_return(:available, :deleting)
@@ -23,7 +23,7 @@ describe Bosh::OpenStackCloud::Cloud do
     volume = double("volume", :id => "v-foo", :state => :busy)
 
     cloud = mock_cloud do |openstack|
-      openstack.volumes.stub(:[]).with("v-foo").and_return(volume)
+      openstack.volumes.stub(:get).with("v-foo").and_return(volume)
     end
 
     expect {

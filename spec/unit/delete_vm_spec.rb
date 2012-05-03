@@ -8,7 +8,7 @@ describe Bosh::OpenStackCloud::Cloud do
     server = double("server", :id => "i-foobar")
 
     cloud = mock_cloud do |openstack|
-      openstack.servers.stub(:[]).with("i-foobar").and_return(server)
+      openstack.servers.stub(:get).with("i-foobar").and_return(server)
     end
 
     server.should_receive(:destroy)

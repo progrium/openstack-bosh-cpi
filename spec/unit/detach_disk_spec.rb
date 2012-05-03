@@ -10,23 +10,13 @@ describe Bosh::OpenStackCloud::Cloud do
     attachment = double("attachment", :device => "/dev/sdf")
 
     cloud = mock_cloud do |openstack|
-      openstack.servers.should_receive(:[]).with("i-test").and_return(server)
-      openstack.volumes.should_receive(:[]).with("v-foobar").and_return(volume)
+      openstack.servers.should_receive(:get).with("i-test").and_return(server)
+      openstack.volumes.should_receive(:get).with("v-foobar").and_return(volume)
     end
 
-    mappings = {
-      "/dev/sdf" => mock("attachment", :volume => mock("volume", :id => "v-foobar")),
-      "/dev/sdg" => mock("attachment", :volume => mock("volume", :id => "v-deadbeef"))
-    }
+    server.should_receive(:detach_volume).with("i-test", "v-foobar")
 
-    server.should_receive(:block_device_mappings).and_return(mappings)
-
-    volume.should_receive(:detach_from).with(server, "/dev/sdf").and_return(attachment)
-
-    attachment.should_receive(:status).and_return(:detaching)
-
-    cloud.should_receive(:wait_resource).with(attachment, :detaching, :detached)
-
+    cloud.stub(:update_agent_settings).and_return({})
     cloud.detach_disk("i-test", "v-foobar")
   end
 
