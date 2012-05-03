@@ -7,7 +7,6 @@ module Bosh::OpenStackCloud
 
     DEFAULT_AVAILABILITY_ZONE = "nova"
 
-    DEFAULT_MAX_RETRIES = 2
     METADATA_TIMEOUT = 5 # seconds
     DEVICE_POLL_TIMEOUT = 60 # seconds
 
@@ -25,8 +24,6 @@ module Bosh::OpenStackCloud
 
       @logger = Bosh::Clouds::Config.logger
 
-      @openstack_logger = @logger # TODO make configurable
-
       @agent_properties = @options["agent"] || {}
       @openstack_properties = @options["openstack"]
       @registry_properties = @options["registry"]
@@ -41,18 +38,27 @@ module Bosh::OpenStackCloud
         :openstack_api_key => @openstack_properties["api_key"],
         :openstack_tenant => @openstack_properties["tenant"]
       }
+      @openstack = Fog::Compute.new(openstack_params)
 
       registry_endpoint = @registry_properties["endpoint"]
       registry_user = @registry_properties["user"]
       registry_password = @registry_properties["password"]
-
-      @openstack = Fog::Compute.new(openstack_params)
-
       @registry = RegistryClient.new(registry_endpoint,
                                      registry_user,
                                      registry_password)
 
       @metadata_lock = Mutex.new
+    end
+
+    ##
+    # Deletes a stemcell
+    # @param [String] stemcell stemcell id that was once returned by {#create_stemcell}
+    def delete_stemcell(stemcell_id)
+      with_thread_name("delete_stemcell(#{stemcell_id})") do
+        @logger.info("Deleting `#{stemcell_id}' stemcell")
+        image = @openstack.images.get(stemcell_id)
+        image.destroy
+      end
     end
 
     ##
@@ -131,7 +137,7 @@ module Bosh::OpenStackCloud
 
         @logger.info("Creating new server...")
         server = @openstack.servers.create(server_params)
-        state = server.state.downcase
+        state = server.state
 
         @logger.info("Creating new server `#{server.id}', state is `#{state}'")
         wait_resource(@openstack.servers, server.id, state, :active)
@@ -154,11 +160,10 @@ module Bosh::OpenStackCloud
     def delete_vm(server_id)
       with_thread_name("delete_vm(#{server_id})") do
         server = @openstack.servers.get(server_id)
-        state = server.state.downcase
+        state = server.state
 
         @logger.info("Deleting server `#{server.id}', state is `#{state}'")
         server.destroy
-
         wait_resource(@openstack.servers, server_id, state, :terminated)
 
         @logger.info("Deleting server settings for `#{server.id}'")
@@ -177,14 +182,17 @@ module Bosh::OpenStackCloud
       end
     end
 
+    ##
+    # Configures networking an existing OpenStack server
+    # @param [String] server_id Running OpenStack server id
+    # @param [Hash] network_spec raw network spec passed by director
     def configure_networks(server_id, network_spec)
       with_thread_name("configure_networks(#{server_id}, ...)") do
         @logger.info("Configuring `#{server_id}' to use the following " \
                      "network settings: #{network_spec.pretty_inspect}")
 
-        network_configurator = NetworkConfigurator.new(network_spec)
         server = @openstack.servers.get(server_id)
-
+        network_configurator = NetworkConfigurator.new(network_spec)
         network_configurator.configure(@openstack, server)
 
         update_agent_settings(server) do |settings|
@@ -193,13 +201,12 @@ module Bosh::OpenStackCloud
       end
     end
 
-
     ##
     # Creates a new OpenStack volume
     # @param [Integer] size disk size in MiB
     # @param [optional, String] server_id vm id
     #        of the VM that this disk will be attached to
-    # @return [String] created EBS volume id
+    # @return [String] created OpenStack volume id
     def create_disk(size, server_id = nil)
       with_thread_name("create_disk(#{size}, #{server_id})") do
         unless size.kind_of?(Integer)
@@ -228,11 +235,11 @@ module Bosh::OpenStackCloud
           :availability_zone => availability_zone
         }
 
+        @logger.info("Creating new volume...")
         volume = @openstack.volumes.create(volume_params)
         state = volume.status
 
-        @logger.info("Creating volume `#{volume.id}', state is `#{state}'")
-
+        @logger.info("Creating new volume `#{volume.id}', state is `#{state}'")
         wait_resource(volume, state, :available)
 
         volume.id
@@ -242,24 +249,23 @@ module Bosh::OpenStackCloud
     ##
     # Deletes OpenStack volume
     # @param [String] disk_id volume id
-    # @raise [Bosh::Clouds::CloudError] if disk is not in available state
-    # @return nil
     def delete_disk(disk_id)
       with_thread_name("delete_disk(#{disk_id})") do
         volume = @openstack.volumes.get(disk_id)
-        state = volume.status.downcase
+        state = volume.status
 
         cloud_error("Cannot delete volume `#{disk_id}', state is #{state}") if state != :available
 
         @logger.info("Deleting volume `#{disk_id}', state is `#{state}'")
         volume.destroy
-
         wait_resource(@openstack.volumes, disk_id, state, :deleted)
-
-        @logger.info("Volume `#{disk_id}' has been deleted")
       end
     end
 
+    ##
+    # Attaches an OpenStack volume to an OpenStack server
+    # @param [String] server_id Running OpenStack server id
+    # @param [String] disk_id volume id
     def attach_disk(server_id, disk_id)
       with_thread_name("attach_disk(#{server_id}, #{disk_id})") do
         server = @openstack.servers.get(server_id)
@@ -267,7 +273,7 @@ module Bosh::OpenStackCloud
 
         device_name = attach_volume(server, volume)
 
-        update_agent_settings(instance) do |settings|
+        update_agent_settings(server) do |settings|
           settings["disks"] ||= {}
           settings["disks"]["persistent"] ||= {}
           settings["disks"]["persistent"][disk_id] = device_name
@@ -275,24 +281,31 @@ module Bosh::OpenStackCloud
       end
     end
 
+    ##
+    # Detaches an OpenStack volume from an OpenStack server
+    # @param [String] server_id Running OpenStack server id
+    # @param [String] disk_id volume id
     def detach_disk(server_id, disk_id)
       with_thread_name("detach_disk(#{server_id}, #{disk_id})") do
         server = @openstack.servers.get(server_id)
         volume = @openstack.volumes.get(disk_id)
 
-        update_agent_settings(instance) do |settings|
+        update_agent_settings(server) do |settings|
           settings["disks"] ||= {}
           settings["disks"]["persistent"] ||= {}
           settings["disks"]["persistent"].delete(disk_id)
         end
 
         detach_volume(server, volume)
-
-        @logger.info("Detached `#{disk_id}' from `#{server_id}'")
       end
     end
 
-
+    ##
+    # Validates the deployment
+    # @api not_yet_used
+    def validate_deployment(old_manifest, new_manifest)
+      not_implemented(:validate_deployment)
+    end
 
     ##
     # Creates a new OpenStack Image using stemcell image.
@@ -356,27 +369,15 @@ module Bosh::OpenStackCloud
       end
     end
 
-    def delete_stemcell(stemcell_id)
-      with_thread_name("delete_stemcell(#{stemcell_id})") do
-        image = @openstack.images.get(stemcell_id)
-        image.destroy
-      end
-    end
-
-    def validate_deployment(old_manifest, new_manifest)
-      not_implemented(:validate_deployment)
-    end
-
     private
 
     ##
     # Generates initial agent settings. These settings will be read by agent
     # from OpenStack registry (also a BOSH component) on a target instance. Disk
-    # conventions for amazon are:
-    # system disk: /dev/sda
-    # ephemeral disk: /dev/sdb
-    # EBS volumes can be configured to map to other device names later (sdf
-    # through sdp, also some kernels will remap sd* to xvd*).
+    # conventions for OpenStack are:
+    # system disk: /dev/vda
+    # OpenStack volumes can be configured to map to other device names later (vdb
+    # through vdz, also some kernels will remap vd* to xvd*).
     #
     # @param [String] agent_id Agent id (will be picked up by agent to
     #   assume its identity
@@ -391,8 +392,7 @@ module Bosh::OpenStackCloud
         "agent_id" => agent_id,
         "networks" => network_spec,
         "disks" => {
-          "system" => "/dev/sda",
-          "ephemeral" => "/dev/sdb",
+          "system" => "/dev/vda",
           "persistent" => {}
         }
       }
@@ -407,6 +407,7 @@ module Bosh::OpenStackCloud
       end
 
       # TODO uncomment to test registry
+      @logger.info("Updating server settings for `#{server.id}'")
       #settings = @registry.read_settings(server.id)
       #yield settings
       #@registry.update_settings(server.id, settings)
@@ -415,6 +416,100 @@ module Bosh::OpenStackCloud
     def generate_unique_name
       UUIDTools::UUID.random_create.to_s
     end
+
+    ##
+    # Soft reboots OpenStack server
+    # @param [Fog::Compute::OpenStack::Server] server OpenStack server
+    def soft_reboot(server)
+      state = server.state
+
+      @logger.info("Soft rebooting server `#{server.id}', state is `#{state}'")
+      server.reboot
+      wait_resource(@openstack.servers, server.id, state, :active)
+    end
+
+    ##
+    # Hard reboots OpenStack server
+    # @param [Fog::Compute::OpenStack::Server] server OpenStack server
+    def hard_reboot(server)
+      state = server.state
+
+      @logger.info("Hard rebooting server `#{server.id}', state is `#{state}'")
+      server.reboot(type = 'HARD')
+      wait_resource(server, state, :running)
+    end
+
+    ##
+    # Attaches an OpenStack volume to an OpenStack server
+    # @param [Fog::Compute::OpenStack::Server] server OpenStack server
+    # @param [Fog::Compute::OpenStack::Volume] volume OpenStack volume
+    def attach_volume(server, volume)
+      volume_attachments = @openstack.get_server_volumes(server.id).body['volumeAttachments']
+      device_names = Set.new(volume_attachments.collect! {|v| v["device"] })
+      new_attachment = nil
+
+      ("b".."z").each do |char|
+        dev_name = "/dev/vd#{char}"
+        if device_names.include?(dev_name)
+          @logger.warn("`#{dev_name}' on `#{server.id}' is taken")
+          next
+        end
+        if volume.attach(server.id, dev_name)
+          new_attachment = dev_name
+        end
+        break
+      end
+
+      if new_attachment.nil?
+        cloud_error("Server has too many disks attached")
+      end
+
+      @logger.info("Attached `#{volume.id}' to `#{server.id}', device name is `#{new_attachment}'")
+
+      new_attachment
+    end
+
+    ##
+    # Detaches an OpenStack volume from an OpenStack server
+    # @param [Fog::Compute::OpenStack::Server] server OpenStack server
+    # @param [Fog::Compute::OpenStack::Volume] volume OpenStack volume
+    def detach_volume(server, volume)
+      volume_attachments = @openstack.get_server_volumes(server.id).body['volumeAttachments']
+      device_map = volume_attachments.collect! {|v| v["volumeId"] }
+
+      if !device_map.include?(volume.id)
+        cloud_error("Disk `#{volume.id}' is not attached to server `#{server.id}'")
+      end
+
+      volume.detach(server.id, volume.id)
+
+      @logger.info("Detached `#{volume.id}' from `#{server.id}'")
+    end
+
+    ##
+    # Checks if options passed to CPI are valid and can actually
+    # be used to create all required data structures etc.
+    #
+    def validate_options
+      unless @options.has_key?("openstack") &&
+          @options["openstack"].is_a?(Hash) &&
+          @options["openstack"]["auth_url"] &&
+          @options["openstack"]["username"] &&
+          @options["openstack"]["api_key"] &&
+          @options["openstack"]["tenant"]
+        raise ArgumentError, "Invalid OpenStack configuration parameters"
+      end
+
+      unless @options.has_key?("registry") &&
+          @options["registry"].is_a?(Hash) &&
+          @options["registry"]["endpoint"] &&
+          @options["registry"]["user"] &&
+          @options["registry"]["password"]
+        raise ArgumentError, "Invalid registry configuration parameters"
+      end
+    end
+
+    # TODO
 
     ##
     # Reads current instance id from EC2 metadata. We are assuming
@@ -442,67 +537,6 @@ module Bosh::OpenStackCloud
     rescue HTTPClient::TimeoutError
       cloud_error("Timed out reading instance metadata, " \
                   "please make sure CPI is running on EC2 instance")
-    end
-
-    def attach_volume(server, volume)
-      device_names = Set.new(server.get_server_volumes.keys)
-      new_attachment = nil
-
-      ("f".."p").each do |char| # f..p is what console suggests
-        # Some kernels will remap sdX to xvdX, so agent needs
-        # to lookup both (sd, then xvd)
-        dev_name = "/dev/sd#{char}"
-        if device_names.include?(dev_name)
-          @logger.warn("`#{dev_name}' on `#{server.id}' is taken")
-          next
-        end
-        new_attachment = volume.attach(server.id, dev_name)
-        break
-      end
-
-      if new_attachment.nil?
-        # TODO: better messaging?
-        cloud_error("Server has too many disks attached")
-      end
-
-      state = new_attachment.status
-
-      @logger.info("Attaching `#{volume.id}' to #{server.id}, " \
-                   "state is #{state}'")
-
-      wait_resource(new_attachment, state, :attached)
-      device_name = new_attachment.device
-
-      @logger.info("Attached `#{volume.id}' to `#{server.id}', " \
-                   "device name is `#{device_name}'")
-
-      device_name
-    end
-
-    def detach_volume(server, volume)
-      mappings = server.get_server_volumes
-
-      device_map = mappings.inject({}) do |hash, (device_name, attachment)|
-        hash[attachment.volume.id] = device_name
-        hash
-      end
-
-      if device_map[volume.id].nil?
-        cloud_error("Disk `#{volume.id}' is not attached " \
-                    "to instance `#{server.id}'")
-      end
-
-      attachment = volume.detach(server.id, device_map[volume.id])
-      state = attachment.status
-
-      @logger.info("Detaching `#{volume.id}' from `#{server.id}', " \
-                   "state is #{state}'")
-
-      begin
-        wait_resource(attachment, state, :detached)
-      rescue AWS::Core::Resource::NotFound
-        # It's OK, just means attachment is gone when we're asking for state
-      end
     end
 
     def unpack_image(tmp_dir, image_path)
@@ -542,57 +576,6 @@ module Bosh::OpenStackCloud
       end
 
       cloud_error("Cannot find EBS volume on current instance")
-    end
-
-    ##
-    # Soft reboots OpenStack server
-    # @param [Fog::Compute::OpenStack::Server] server OpenStack server
-    def soft_reboot(server)
-      # There is no trackable status change for the server being
-      # rebooted, so it's up to CPI client to keep track of agent
-      # being ready after reboot.
-      server.reboot
-
-      @logger.info("Soft rebooting server `#{server.id}', " \
-                   "state is `#{state}'")
-    end
-
-    ##
-    # Hard reboots OpenStack server
-    # @param [Fog::Compute::OpenStack::Server] server OpenStack server
-    def hard_reboot(server)
-      # N.B. This will only work with ebs-store instances,
-      # as instance-store instances don't support stop/start.
-      server.reboot(type = 'HARD')
-      state = server.status
-
-      @logger.info("Hard rebooting server `#{server.id}', " \
-                   "state is `#{state}'")
-
-      wait_resource(server, state, :running)
-    end
-
-    ##
-    # Checks if options passed to CPI are valid and can actually
-    # be used to create all required data structures etc.
-    #
-    def validate_options
-      unless @options.has_key?("openstack") &&
-          @options["openstack"].is_a?(Hash) &&
-          @options["openstack"]["auth_url"] &&
-          @options["openstack"]["username"] &&
-          @options["openstack"]["api_key"] &&
-          @options["openstack"]["tenant"]
-        raise ArgumentError, "Invalid OpenStack configuration parameters"
-      end
-
-      unless @options.has_key?("registry") &&
-          @options["registry"].is_a?(Hash) &&
-          @options["registry"]["endpoint"] &&
-          @options["registry"]["user"] &&
-          @options["registry"]["password"]
-        raise ArgumentError, "Invalid registry configuration parameters"
-      end
     end
 
   end
