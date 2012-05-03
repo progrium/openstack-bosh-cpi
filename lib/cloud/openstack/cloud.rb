@@ -3,6 +3,8 @@
 module Bosh::OpenStackCloud
 
   class Cloud < Bosh::Cloud
+    attr_reader :openstack
+
     ##
     # Initialize BOSH OpenStack CPI
     # @param [Hash] options CPI options
@@ -25,7 +27,7 @@ module Bosh::OpenStackCloud
         :openstack_tenant => @openstack_properties["tenant"]
       }
 
-      @os = Fog::Compute.new(openstack_params)
+      @openstack = Fog::Compute.new(openstack_params)
     end
 
     ##
@@ -58,7 +60,7 @@ module Bosh::OpenStackCloud
         }
 
         @logger.info("Creating new instance...")
-        instance = @os.servers.create(instance_params)
+        instance = @openstack.servers.create(instance_params)
         state = instance.state
 
         @logger.info("Creating new instance `#{instance.id}', " \
@@ -77,7 +79,7 @@ module Bosh::OpenStackCloud
     # @param [String] vm_id Running instance id
     def delete_vm(instance_id)
       with_thread_name("delete_vm(#{instance_id})") do
-        instance = @os.instances[instance_id]
+        instance = @openstack.instances[instance_id]
 
         instance.destroy
         state = instance.state
@@ -94,7 +96,7 @@ module Bosh::OpenStackCloud
     # @param [String] instance_id Running instance id
     def reboot_vm(instance_id)
       with_thread_name("reboot_vm(#{instance_id})") do
-        instance = @os.instances[instance_id]
+        instance = @openstack.instances[instance_id]
         soft_reboot(instance)
       end
     end
@@ -115,7 +117,7 @@ module Bosh::OpenStackCloud
           :size => (size / 1024.0).ceil,
         }
 
-        volume = @os.volumes.create_volume(volume_params)
+        volume = @openstack.volumes.create_volume(volume_params)
         state = volume.state
 
         @logger.info("Creating volume `#{volume.id}', " \
@@ -134,7 +136,7 @@ module Bosh::OpenStackCloud
     # @return nil
     def delete_disk(disk_id)
       with_thread_name("delete_disk(#{disk_id})") do
-        volume = @os.volumes[disk_id]
+        volume = @openstack.volumes[disk_id]
         state = volume.state
 
         if state != :available
@@ -158,8 +160,8 @@ module Bosh::OpenStackCloud
 
     def attach_disk(instance_id, disk_id)
       with_thread_name("attach_disk(#{instance_id}, #{disk_id})") do
-        instance = @os.servers[instance_id]
-        volume = @os.volumes[disk_id]
+        instance = @openstack.servers[instance_id]
+        volume = @openstack.volumes[disk_id]
 
         device_name = instance.attach_volume(volume.id, instance.id, disk_id)
 
@@ -173,8 +175,8 @@ module Bosh::OpenStackCloud
 
     def detach_disk(instance_id, disk_id)
       with_thread_name("detach_disk(#{instance_id}, #{disk_id})") do
-        instance = @os.servers[instance_id]
-        volume = @os.volumes[disk_id]
+        instance = @openstack.servers[instance_id]
+        volume = @openstack.volumes[disk_id]
 
         update_agent_settings(instance) do |settings|
           settings["disks"] ||= {}
@@ -242,7 +244,7 @@ module Bosh::OpenStackCloud
         raise ArgumentError, "block is not provided"
       end
 
-      settings = @os.server(instance.id)
+      settings = @openstack.server(instance.id)
       yield settings
     end
 

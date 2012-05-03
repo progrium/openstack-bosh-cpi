@@ -41,8 +41,8 @@ module ConsoleHelpers
     @cpi ||= Bosh::OpenStackCloud::Cloud.new(@config)
   end
 
-  def os
-    cpi.os
+  def openstack
+    cpi.openstack
   end
 end
 
@@ -61,5 +61,6 @@ end
 
 puts "=> Welcome to BOSH OpenStack CPI console"
 puts "You can use 'cpi' to access CPI methods"
+puts "You can use 'openstack' to access Fog::Compute::OpenStack methods"
 
 IRB.start
