@@ -1,4 +1,4 @@
-# Copyright (c) 2009-2012 VMware, Inc.
+# Copyright (c) 2012 Piston Cloud Computing, Inc.
 
 $:.unshift(File.expand_path("../../rake", __FILE__))
 
@@ -14,8 +14,8 @@ begin
 rescue LoadError
 end
 
-require "bundler_task"
-require "ci_task"
+require "../bosh/rake/bundler_task"
+require "../bosh/rake/ci_task"
 
 gem_helper = Bundler::GemHelper.new(Dir.pwd)
 

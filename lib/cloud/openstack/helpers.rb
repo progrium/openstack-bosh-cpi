@@ -1,6 +1,6 @@
-# Copyright (c) 2009-2012 VMware, Inc.
+# Copyright (c) 2012 Piston Cloud Computing, Inc.
 
-module Bosh::AwsCloud
+module Bosh::OpenStackCloud
 
   module Helpers
 

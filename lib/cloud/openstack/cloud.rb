@@ -3,6 +3,8 @@
 module Bosh::OpenStackCloud
 
   class Cloud < Bosh::Cloud
+    include Helpers
+
     attr_reader :openstack
 
     ##

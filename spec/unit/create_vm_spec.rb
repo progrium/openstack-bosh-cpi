@@ -1,8 +1,8 @@
-# Copyright (c) 2009-2012 VMware, Inc.
+# Copyright (c) 2012 Piston Cloud Computing, Inc.
 
 require File.expand_path("../../spec_helper", __FILE__)
 
-describe Bosh::AwsCloud::Cloud, "create_vm" do
+describe Bosh::OpenStackCloud::Cloud, "create_vm" do
 
   def agent_settings(unique_name, network_spec=dynamic_network_spec)
     {
@@ -24,46 +24,31 @@ describe Bosh::AwsCloud::Cloud, "create_vm" do
     }
   end
 
-  def ec2_params(user_data, security_groups=[])
+  def openstack_params(user_data, security_groups=[])
     {
       :image_id => "sc-id",
-      :count => 1,
-      :key_name => "test_key",
-      :security_groups => security_groups,
       :instance_type => "m3.zb",
       :user_data => Yajl::Encoder.encode(user_data),
-      :availability_zone => "foobar-1a"
     }
   end
 
-  before(:each) do
-    @registry = mock_registry
-  end
-
-  it "creates EC2 instance and polls until it's ready" do
+  it "creates OpenStack instance and polls until it's ready" do
     unique_name = UUIDTools::UUID.random_create.to_s
 
-    user_data = {
-      "registry" => {
-        "endpoint" => "http://registry:3333"
-      }
-    }
+    user_data = {}
 
     instance = double("instance",
-                      :id => "i-test",
-                      :elastic_ip => nil)
+                      :id => "i-test")
 
-    cloud = mock_cloud do |ec2|
-      ec2.instances.should_receive(:create).
-        with(ec2_params(user_data)).
+    cloud = mock_cloud do |openstack|
+      openstack.instances.should_receive(:create).
+        with(openstack_params(user_data)).
         and_return(instance)
     end
 
     instance.should_receive(:status).and_return(:pending)
     cloud.should_receive(:generate_unique_name).and_return(unique_name)
     cloud.should_receive(:wait_resource).with(instance, :pending, :running)
-    @registry.should_receive(:update_settings)
-      .with("i-test", agent_settings(unique_name))
 
     vm_id = cloud.create_vm("agent-id", "sc-id",
                             resource_pool_spec,
@@ -71,64 +56,6 @@ describe Bosh::AwsCloud::Cloud, "create_vm" do
                             nil, { "test_env" => "value" })
 
     vm_id.should == "i-test"
-  end
-
-  it "creates EC2 instance with security group" do
-    unique_name = UUIDTools::UUID.random_create.to_s
-
-    user_data = {
-      "registry" => {
-        "endpoint" => "http://registry:3333"
-      }
-    }
-
-    instance = double("instance",
-                      :id => "i-test",
-                      :elastic_ip => nil)
-
-    security_groups = %w[foo bar]
-    network_spec = dynamic_network_spec
-    network_spec["cloud_properties"] = {
-      "security_groups" => security_groups
-    }
-
-    cloud = mock_cloud do |ec2|
-      ec2.instances.should_receive(:create).
-        with(ec2_params(user_data, security_groups)).
-        and_return(instance)
-    end
-
-    instance.should_receive(:status).and_return(:pending)
-    cloud.should_receive(:generate_unique_name).and_return(unique_name)
-    cloud.should_receive(:wait_resource).with(instance, :pending, :running)
-    @registry.should_receive(:update_settings)
-      .with("i-test", agent_settings(unique_name, network_spec))
-
-    vm_id = cloud.create_vm("agent-id", "sc-id",
-                            resource_pool_spec,
-                            { "network_a" => network_spec },
-                            nil, { "test_env" => "value" })
-
-    vm_id.should == "i-test"
-  end
-
-  it "associates instance with elastic ip if vip network is provided" do
-    instance = double("instance",
-                      :id => "i-test",
-                      :elastic_ip => nil)
-
-    cloud = mock_cloud do |ec2|
-      ec2.instances.should_receive(:create).and_return(instance)
-    end
-
-    instance.should_receive(:status).and_return(:pending)
-    instance.should_receive(:associate_elastic_ip).with("10.0.0.1")
-    cloud.should_receive(:wait_resource).with(instance, :pending, :running)
-    @registry.should_receive(:update_settings)
-
-    vm_id = cloud.create_vm("agent-id", "sc-id",
-                            resource_pool_spec,
-                            combined_network_spec)
   end
 
 end

@@ -1,21 +1,17 @@
-# Copyright (c) 2009-2012 VMware, Inc.
+# Copyright (c) 2012 Piston Cloud Computing, Inc.
 
 require File.expand_path("../../spec_helper", __FILE__)
 
-describe Bosh::AwsCloud::Cloud do
+describe Bosh::OpenStackCloud::Cloud do
 
-  before(:each) do
-    @registry = mock_registry
-  end
-
-  it "attaches EC2 volume to an instance" do
+  it "attaches OpenStack volume to an instance" do
     instance = double("instance", :id => "i-test")
     volume = double("volume", :id => "v-foobar")
     attachment = double("attachment", :device => "/dev/sdf")
 
-    cloud = mock_cloud do |ec2|
-      ec2.instances.should_receive(:[]).with("i-test").and_return(instance)
-      ec2.volumes.should_receive(:[]).with("v-foobar").and_return(volume)
+    cloud = mock_cloud do |openstack|
+      openstack.instances.should_receive(:[]).with("i-test").and_return(instance)
+      openstack.volumes.should_receive(:[]).with("v-foobar").and_return(volume)
     end
 
     volume.should_receive(:attach_to).
@@ -36,12 +32,6 @@ describe Bosh::AwsCloud::Cloud do
       }
     }
 
-    @registry.should_receive(:read_settings).
-      with("i-test").
-      and_return(old_settings)
-
-    @registry.should_receive(:update_settings).with("i-test", new_settings)
-
     cloud.attach_disk("i-test", "v-foobar")
   end
 
@@ -50,9 +40,9 @@ describe Bosh::AwsCloud::Cloud do
     volume = double("volume", :id => "v-foobar")
     attachment = double("attachment", :device => "/dev/sdh")
 
-    cloud = mock_cloud do |ec2|
-      ec2.instances.should_receive(:[]).with("i-test").and_return(instance)
-      ec2.volumes.should_receive(:[]).with("v-foobar").and_return(volume)
+    cloud = mock_cloud do |openstack|
+      openstack.instances.should_receive(:[]).with("i-test").and_return(instance)
+      openstack.volumes.should_receive(:[]).with("v-foobar").and_return(volume)
     end
 
     instance.should_receive(:block_device_mappings).
@@ -74,12 +64,6 @@ describe Bosh::AwsCloud::Cloud do
       }
     }
 
-    @registry.should_receive(:read_settings).
-      with("i-test").
-      and_return(old_settings)
-
-    @registry.should_receive(:update_settings).with("i-test", new_settings)
-
     cloud.attach_disk("i-test", "v-foobar")
   end
 
@@ -88,9 +72,9 @@ describe Bosh::AwsCloud::Cloud do
     volume = double("volume", :id => "v-foobar")
     attachment = double("attachment", :device => "/dev/sdh")
 
-    cloud = mock_cloud do |ec2|
-      ec2.instances.should_receive(:[]).with("i-test").and_return(instance)
-      ec2.volumes.should_receive(:[]).with("v-foobar").and_return(volume)
+    cloud = mock_cloud do |openstack|
+      openstack.instances.should_receive(:[]).with("i-test").and_return(instance)
+      openstack.volumes.should_receive(:[]).with("v-foobar").and_return(volume)
     end
 
     instance.should_receive(:block_device_mappings).
@@ -111,12 +95,6 @@ describe Bosh::AwsCloud::Cloud do
         }
       }
     }
-
-    @registry.should_receive(:read_settings).
-      with("i-test").
-      and_return(old_settings)
-
-    @registry.should_receive(:update_settings).with("i-test", new_settings)
 
     cloud.attach_disk("i-test", "v-foobar")
   end
@@ -125,9 +103,9 @@ describe Bosh::AwsCloud::Cloud do
     instance = double("instance", :id => "i-test")
     volume = double("volume", :id => "v-foobar")
 
-    cloud = mock_cloud do |ec2|
-      ec2.instances.should_receive(:[]).with("i-test").and_return(instance)
-      ec2.volumes.should_receive(:[]).with("v-foobar").and_return(volume)
+    cloud = mock_cloud do |openstack|
+      openstack.instances.should_receive(:[]).with("i-test").and_return(instance)
+      openstack.volumes.should_receive(:[]).with("v-foobar").and_return(volume)
     end
 
     all_mappings = ("f".."p").inject({}) do |hash, char|

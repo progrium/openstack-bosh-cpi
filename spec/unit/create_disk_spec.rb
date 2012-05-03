@@ -1,10 +1,10 @@
-# Copyright (c) 2009-2012 VMware, Inc.
+# Copyright (c) 2012 Piston Cloud Computing, Inc.
 
 require File.expand_path("../../spec_helper", __FILE__)
 
-describe Bosh::AwsCloud::Cloud do
+describe Bosh::OpenStackCloud::Cloud do
 
-  it "creates an EC2 volume" do
+  it "creates an OpenStack volume" do
     disk_params = {
       :size => 2,
       :availability_zone => "us-east-1a"
@@ -12,8 +12,8 @@ describe Bosh::AwsCloud::Cloud do
 
     volume = double("volume", :id => "v-foobar")
 
-    cloud = mock_cloud do |ec2|
-      ec2.volumes.should_receive(:create).with(disk_params).and_return(volume)
+    cloud = mock_cloud do |openstack|
+      openstack.volumes.should_receive(:create).with(disk_params).and_return(volume)
     end
 
     volume.should_receive(:state).and_return(:creating)
@@ -30,8 +30,8 @@ describe Bosh::AwsCloud::Cloud do
 
     volume = double("volume", :id => "v-foobar")
 
-    cloud = mock_cloud do |ec2|
-      ec2.volumes.should_receive(:create).with(disk_params).and_return(volume)
+    cloud = mock_cloud do |openstack|
+      openstack.volumes.should_receive(:create).with(disk_params).and_return(volume)
     end
 
     volume.should_receive(:state).and_return(:creating)
@@ -48,29 +48,6 @@ describe Bosh::AwsCloud::Cloud do
     expect {
       mock_cloud.create_disk(2000 * 1024)
     }.to raise_error(Bosh::Clouds::CloudError, /maximum disk size is 1 TiB/)
-  end
-
-  it "puts disk in the same AZ as an instance" do
-    disk_params = {
-      :size => 1,
-      :availability_zone => "foobar-land"
-    }
-
-    instance = double("instance",
-                      :id => "i-test",
-                      :availability_zone => "foobar-land")
-
-    volume = double("volume", :id => "v-foobar")
-
-    cloud = mock_cloud do |ec2|
-      ec2.volumes.should_receive(:create).with(disk_params).and_return(volume)
-      ec2.instances.stub(:[]).with("i-test").and_return(instance)
-    end
-
-    volume.should_receive(:state).and_return(:creating)
-    cloud.should_receive(:wait_resource).with(volume, :creating, :available)
-
-    cloud.create_disk(1024, "i-test")
   end
 
 end
