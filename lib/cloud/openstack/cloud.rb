@@ -81,7 +81,7 @@ module Bosh::OpenStackCloud
     # @param [String] vm_id Running server id
     def delete_vm(server_id)
       with_thread_name("delete_vm(#{server_id})") do
-        server = @openstack.servers[server_id]
+        server = @openstack.servers.get(server_id)
 
         server.destroy
         state = server.state
@@ -98,7 +98,7 @@ module Bosh::OpenStackCloud
     # @param [String] server_id Running server id
     def reboot_vm(server_id)
       with_thread_name("reboot_vm(#{server_id})") do
-        server = @openstack.servers[server_id]
+        server = @openstack.servers.get(server_id)
         soft_reboot(server)
       end
     end
@@ -138,7 +138,7 @@ module Bosh::OpenStackCloud
     # @return nil
     def delete_disk(disk_id)
       with_thread_name("delete_disk(#{disk_id})") do
-        volume = @openstack.volumes[disk_id]
+        volume = @openstack.volumes.get(disk_id)
         state = volume.state
 
         if state != :available
@@ -162,8 +162,8 @@ module Bosh::OpenStackCloud
 
     def attach_disk(server_id, disk_id)
       with_thread_name("attach_disk(#{server_id}, #{disk_id})") do
-        server = @openstack.servers[server_id]
-        volume = @openstack.volumes[disk_id]
+        server = @openstack.servers.get(server_id)
+        volume = @openstack.volumes.get(disk_id)
 
         device_name = server.attach_volume(volume.id, server_id, disk_id)
 
@@ -177,8 +177,8 @@ module Bosh::OpenStackCloud
 
     def detach_disk(server_id, disk_id)
       with_thread_name("detach_disk(#{server_id}, #{disk_id})") do
-        server = @openstack.servers[server_id]
-        volume = @openstack.volumes[disk_id]
+        server = @openstack.servers.get(server_id)
+        volume = @openstack.volumes.get(disk_id)
 
         update_agent_settings(server) do |settings|
           settings["disks"] ||= {}

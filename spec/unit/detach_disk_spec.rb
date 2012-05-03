@@ -27,25 +27,6 @@ describe Bosh::OpenStackCloud::Cloud do
 
     cloud.should_receive(:wait_resource).with(attachment, :detaching, :detached)
 
-    old_settings = {
-      "foo" => "bar",
-      "disks" => {
-        "persistent" => {
-          "v-foobar" => "/dev/sdf",
-          "v-deadbeef" => "/dev/sdg"
-        }
-      }
-    }
-
-    new_settings = {
-      "foo" => "bar",
-      "disks" => {
-        "persistent" => {
-          "v-deadbeef" => "/dev/sdg"
-        }
-      }
-    }
-
     cloud.detach_disk("i-test", "v-foobar")
   end
 
