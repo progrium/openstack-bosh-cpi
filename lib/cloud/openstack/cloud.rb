@@ -140,7 +140,7 @@ module Bosh::OpenStackCloud
         state = server.state
 
         @logger.info("Creating new server `#{server.id}', state is `#{state}'")
-        wait_resource(@openstack.servers, server.id, state, "active")
+        wait_resource(server, server.id, state, :active)
 
         @logger.info("Configuring network for `#{server.id}'")
         network_configurator.configure(@openstack, server)
@@ -164,7 +164,7 @@ module Bosh::OpenStackCloud
 
         @logger.info("Deleting server `#{server.id}', state is `#{state}'")
         server.destroy
-        wait_resource(@openstack.servers, server_id, state, "terminated")
+        wait_resource(server, server_id, state, :deleted)
 
         @logger.info("Deleting server settings for `#{server.id}'")
         # TODO uncomment to test registry
@@ -229,18 +229,16 @@ module Bosh::OpenStackCloud
         end
 
         volume_params = {
-          :name => "volume-#{generate_unique_name}",
-          :description => "",
           :size => (size / 1024.0).ceil,
           :availability_zone => availability_zone
         }
 
         @logger.info("Creating new volume...")
-        volume = @openstack.volumes.create(volume_params)
-        state = volume.status
+        volume = @openstack.volumes.create_volume(volume_params)
+        state = volume.state
 
         @logger.info("Creating new volume `#{volume.id}', state is `#{state}'")
-        wait_resource(@openstack.volumes, volume.id, state, "available")
+        wait_resource(volume, volume.id, state, :available)
 
         volume.id
       end
@@ -252,13 +250,16 @@ module Bosh::OpenStackCloud
     def delete_disk(disk_id)
       with_thread_name("delete_disk(#{disk_id})") do
         volume = @openstack.volumes.get(disk_id)
-        state = volume.status
+        state = volume.state
 
-        cloud_error("Cannot delete volume `#{disk_id}', state is #{state}") if state.downcase != "available"
+        if state != :available
+          cloud_error("Cannot delete volume `#{disk_id}', state is #{state}")
+        end
 
         @logger.info("Deleting volume `#{disk_id}', state is `#{state}'")
         volume.destroy
-        wait_resource(@openstack.volumes, disk_id, state, "deleted")
+
+        wait_resource(volume, disk_id, state, :deleted)
       end
     end
 
@@ -373,7 +374,7 @@ module Bosh::OpenStackCloud
 
     ##
     # Generates initial agent settings. These settings will be read by agent
-    # from OpenStack registry (also a BOSH component) on a target instance. Disk
+    # from OpenStack registry (also a BOSH component) on a target server. Disk
     # conventions for OpenStack are:
     # system disk: /dev/vda
     # OpenStack volumes can be configured to map to other device names later (vdb
@@ -425,7 +426,6 @@ module Bosh::OpenStackCloud
 
       @logger.info("Soft rebooting server `#{server.id}', state is `#{state}'")
       server.reboot
-      wait_resource(@openstack.servers, server.id, state, "active")
     end
 
     ##
@@ -436,7 +436,6 @@ module Bosh::OpenStackCloud
 
       @logger.info("Hard rebooting server `#{server.id}', state is `#{state}'")
       server.reboot(type = 'HARD')
-      wait_resource(@openstack.servers, server.id, state, "active")
     end
 
     ##
@@ -444,7 +443,7 @@ module Bosh::OpenStackCloud
     # @param [Fog::Compute::OpenStack::Server] server OpenStack server
     # @param [Fog::Compute::OpenStack::Volume] volume OpenStack volume
     def attach_volume(server, volume)
-      volume_attachments = @openstack.get_server_volumes(server.id).body['volumeAttachments']
+      volume_attachments = @openstack.volumes.get(server.id).body['volumeAttachments']
       device_names = Set.new(volume_attachments.collect! {|v| v["device"] })
       new_attachment = nil
 
@@ -471,10 +470,10 @@ module Bosh::OpenStackCloud
 
     ##
     # Detaches an OpenStack volume from an OpenStack server
-    # @param [Fog::Compute::OpenStack::Server] server OpenStack server
-    # @param [Fog::Compute::OpenStack::Volume] volume OpenStack volume
+    # @param [Fog::Compute::OpenStack::Server] OpenStack server
+    # @param [Fog::Compute::OpenStack::Volume] OpenStack volume
     def detach_volume(server, volume)
-      volume_attachments = @openstack.get_server_volumes(server.id).body['volumeAttachments']
+      volume_attachments = @openstack.volumes.get(server.id).body['volumeAttachments']
       device_map = volume_attachments.collect! {|v| v["volumeId"] }
 
       if !device_map.include?(volume.id)
@@ -512,8 +511,8 @@ module Bosh::OpenStackCloud
     # TODO
 
     ##
-    # Reads current instance id from EC2 metadata. We are assuming
-    # instance id cannot change while current process is running
+    # Reads current server id from metadata. We are assuming
+    # server id cannot change while current process is running
     # and thus memoizing it.
     def current_instance_id
       @metadata_lock.synchronize do
@@ -522,7 +521,7 @@ module Bosh::OpenStackCloud
         client = HTTPClient.new
         client.connect_timeout = METADATA_TIMEOUT
         # Using 169.254.169.254 is an EC2 convention for getting
-        # instance metadata
+        # server metadata
         uri = "http://169.254.169.254/1.0/meta-data/instance-id/"
 
         response = client.get(uri)

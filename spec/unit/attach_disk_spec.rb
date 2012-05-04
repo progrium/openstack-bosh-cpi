@@ -4,20 +4,20 @@ require File.expand_path("../../spec_helper", __FILE__)
 
 describe Bosh::OpenStackCloud::Cloud do
 
+  before(:each) do
+    @registry = mock_registry
+  end
+
   it "attaches OpenStack volume to a server" do
-    server = double("server", :id => "i-test")
-    volume = double("volume", :id => "v-foobar")
-    attachment = double("attachment", :device => "/dev/sdf")
+  end
 
-    cloud = mock_cloud do |openstack|
-      openstack.servers.should_receive(:get).with("i-test").and_return(server)
-      openstack.volumes.should_receive(:get).with("v-foobar").and_return(volume)
-    end
+  it "picks available device name" do
+  end
 
-    server.should_receive(:attach_volume).with("v-foobar", "i-test", "v-foobar")
+  it "picks available device name" do
+  end
 
-    cloud.stub(:update_agent_settings).and_return({})
-    cloud.attach_disk("i-test", "v-foobar")
+  it "raises an error when sdf..sdp are all reserved" do
   end
 
 end

@@ -7,6 +7,7 @@ describe Bosh::OpenStackCloud::Cloud do
   it "creates an OpenStack volume" do
     disk_params = {
       :size => 2,
+      :availability_zone => "nova"
     }
 
     volume = double("volume", :id => "v-foobar")
@@ -17,14 +18,14 @@ describe Bosh::OpenStackCloud::Cloud do
 
     volume.should_receive(:state).and_return(:creating)
 
-    cloud.should_receive(:wait_resource).with(volume, :creating, :available)
-
+    cloud.should_receive(:wait_resource).with(volume, "v-foobar", :creating, :available)
     cloud.create_disk(2048).should == "v-foobar"
   end
 
   it "rounds up disk size" do
     disk_params = {
       :size => 3,
+      :availability_zone => "nova"
     }
 
     volume = double("volume", :id => "v-foobar")
@@ -35,8 +36,7 @@ describe Bosh::OpenStackCloud::Cloud do
 
     volume.should_receive(:state).and_return(:creating)
 
-    cloud.should_receive(:wait_resource).with(volume, :creating, :available)
-
+    cloud.should_receive(:wait_resource).with(volume, "v-foobar", :creating, :available)
     cloud.create_disk(2049)
   end
 

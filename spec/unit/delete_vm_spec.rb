@@ -14,7 +14,7 @@ describe Bosh::OpenStackCloud::Cloud do
     server.should_receive(:destroy)
     server.should_receive(:state)
 
-    cloud.should_receive(:wait_resource).with(server, nil, :deleted)
+    cloud.should_receive(:wait_resource).with(server, "i-foobar", nil, :deleted)
 
     cloud.delete_vm("i-foobar")
   end
