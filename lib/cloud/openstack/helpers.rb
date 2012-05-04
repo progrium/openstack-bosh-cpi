@@ -25,10 +25,10 @@ module Bosh::OpenStackCloud
                       timeout = DEFAULT_TIMEOUT)
 
       started_at = Time.now
-      state = resource.send(state_method, resource_id).state.downcase
+      state = resource.send(state_method, resource_id).status.downcase
       desc = resource.class.name + " " + resource_id.to_s
 
-      while state == start_state && state != target_state
+      while state != target_state
         duration = Time.now - started_at
 
         if duration > timeout
@@ -44,7 +44,7 @@ module Bosh::OpenStackCloud
         if resource_state.nil?
           state = target_state
         else
-          state = resource_state.state.downcase
+          state = resource_state.status.downcase
         end
       end
 
