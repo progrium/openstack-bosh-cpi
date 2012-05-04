@@ -6,9 +6,8 @@ module Bosh::OpenStackCloud
     include Helpers
 
     DEFAULT_AVAILABILITY_ZONE = "nova"
-
-    METADATA_TIMEOUT = 5 # seconds
     DEVICE_POLL_TIMEOUT = 60 # seconds
+    METADATA_TIMEOUT = 5 # seconds
 
     attr_reader :openstack
     attr_reader :registry
@@ -48,6 +47,76 @@ module Bosh::OpenStackCloud
                                      registry_password)
 
       @metadata_lock = Mutex.new
+    end
+
+    ##
+    # Creates a new OpenStack Image using stemcell image.
+    # This method can only be run on an OpenStack server, as image creation
+    # involves creating and mounting a new OpenStack volume as local block device.
+    # @param [String] image_path local filesystem path to a stemcell image
+    # @param [Hash] cloud_properties CPI-specific properties
+    def create_stemcell(image_path, cloud_properties)
+      # TODO: refactor into several smaller methods
+      with_thread_name("create_stemcell(#{image_path}...)") do
+        begin
+          # These two variables are used in 'ensure' clause
+          server = nil
+          volume = nil
+
+          # 1. Create and mount new OpenStack volume (2GB default)
+          disk_size = cloud_properties["disk"] || 2048
+          volume_id = create_disk(disk_size, current_instance_id)
+          volume = @openstack.volumes.get(volume_id)
+          server = @openstack.servers.get(current_instance_id)
+
+          vd_name = attach_volume(server, volume)
+          device_name = find_device(vd_name)
+
+          # 2. Copy image to new OpenStack volume
+          Dir.mktmpdir do |tmp_dir|
+            @logger.info("Extracting stemcell to `#{tmp_dir}'")
+
+            unpack_image(tmp_dir, image_path)
+            copy_root_image(tmp_dir, device_name)
+
+            # 3. Create snapshot and then an image using this snapshot
+            snapshot = volume.create_snapshot
+            wait_resource(snapshot, snapshot.status, :completed)
+
+            image_params = {
+              :name => "BOSH-#{generate_unique_name}",
+              :disk_format => "ami",
+              :container_format => "ami",
+
+              :architecture => "x86_64",
+              :kernel_id => cloud_properties["kernel_id"] || DEFAULT_AKI,
+              :root_device_name => "/dev/sda",
+              :block_device_mappings => {
+                "/dev/sda" => { :snapshot_id => snapshot.id },
+                "/dev/sdb" => "ephemeral0"
+              }
+            }
+
+            @logger.info("Creating new image...")
+            image = @openstack.images.create(image_params)
+            state = image.status
+
+            @logger.info("Creating new image `#{image.id}', state is `#{state}'")
+            wait_resource(@openstack.images, image.id, state, "deleted")
+
+            image.id
+          end
+        rescue => e
+          # TODO: delete snapshot?
+          @logger.error(e)
+          raise e
+        ensure
+          if server && volume
+            detach_volume(server, volume)
+            delete_disk(volume.id)
+          end
+        end
+      end
     end
 
     ##
@@ -290,13 +359,13 @@ module Bosh::OpenStackCloud
         server = @openstack.servers.get(server_id)
         volume = @openstack.volumes.get(disk_id)
 
+        detach_volume(server, volume)
+
         update_agent_settings(server) do |settings|
           settings["disks"] ||= {}
           settings["disks"]["persistent"] ||= {}
           settings["disks"]["persistent"].delete(disk_id)
         end
-
-        detach_volume(server, volume)
       end
     end
 
@@ -305,68 +374,6 @@ module Bosh::OpenStackCloud
     # @api not_yet_used
     def validate_deployment(old_manifest, new_manifest)
       not_implemented(:validate_deployment)
-    end
-
-    ##
-    # Creates a new OpenStack Image using stemcell image.
-    # This method can only be run on an EC2 instance, as image creation
-    # involves creating and mounting new EBS volume as local block device.
-    # @param [String] image_path local filesystem path to a stemcell image
-    # @param [Hash] cloud_properties CPI-specific properties
-    def create_stemcell(image_path, cloud_properties)
-      # TODO: refactor into several smaller methods
-      with_thread_name("create_stemcell(#{image_path}...)") do
-        begin
-          # These two variables are used in 'ensure' clause
-          instance = nil
-          volume = nil
-          # 1. Create and mount new EBS volume (2GB default)
-          disk_size = cloud_properties["disk"] || 2048
-          volume_id = create_disk(disk_size, current_instance_id)
-          volume = @ec2.volumes[volume_id]
-          instance = @ec2.instances[current_instance_id]
-
-          sd_name = attach_ebs_volume(instance, volume)
-          ebs_volume = find_ebs_device(sd_name)
-
-          # 2. Copy image to new EBS volume
-          Dir.mktmpdir do |tmp_dir|
-            @logger.info("Extracting stemcell to `#{tmp_dir}'")
-
-            unpack_image(tmp_dir, image_path)
-            copy_root_image(tmp_dir, ebs_volume)
-
-            # 3. Create snapshot and then an image using this snapshot
-            snapshot = volume.create_snapshot
-            wait_resource(snapshot, snapshot.status, :completed)
-
-            image_params = {
-              :name => "BOSH-#{generate_unique_name}",
-              :architecture => "x86_64",
-              :kernel_id => cloud_properties["kernel_id"] || DEFAULT_AKI,
-              :root_device_name => "/dev/sda",
-              :block_device_mappings => {
-                "/dev/sda" => { :snapshot_id => snapshot.id },
-                "/dev/sdb" => "ephemeral0"
-              }
-            }
-
-            image = @ec2.images.create(image_params)
-            wait_resource(image, image.state, :available, :state)
-
-            image.id
-          end
-        rescue => e
-          # TODO: delete snapshot?
-          @logger.error(e)
-          raise e
-        ensure
-          if instance && volume
-            detach_ebs_volume(instance, volume)
-            delete_disk(volume.id)
-          end
-        end
-      end
     end
 
     private
@@ -408,9 +415,9 @@ module Bosh::OpenStackCloud
 
       # TODO uncomment to test registry
       @logger.info("Updating server settings for `#{server.id}'")
-      #settings = @registry.read_settings(server.id)
-      #yield settings
-      #@registry.update_settings(server.id, settings)
+      settings = @registry.read_settings(server.id)
+      yield settings
+      @registry.update_settings(server.id, settings)
     end
 
     def generate_unique_name
@@ -465,7 +472,7 @@ module Bosh::OpenStackCloud
       end
 
       @logger.info("Attached `#{volume.id}' to `#{server.id}', device name is `#{new_attachment}'")
-
+      # TODO wait_resource?
       new_attachment
     end
 
@@ -484,6 +491,72 @@ module Bosh::OpenStackCloud
       volume.detach(server.id, volume.id)
 
       @logger.info("Detached `#{volume.id}' from `#{server.id}'")
+    end
+
+    ##
+    # Reads current instance id from OpenStack metadata. We are assuming
+    # instance id cannot change while current process is running
+    # and thus memoizing it.
+    def current_instance_id
+      @metadata_lock.synchronize do
+        return @current_instance_id if @current_instance_id
+
+        client = HTTPClient.new
+        client.connect_timeout = METADATA_TIMEOUT
+        # Using 169.254.169.254 is an OpenStack convention for getting
+        # instance metadata
+        uri = "http://169.254.169.254/1.0/meta-data/instance-id/"
+
+        response = client.get(uri)
+        unless response.status == 200
+          cloud_error("Instance metadata endpoint returned HTTP #{response.status}")
+        end
+
+        @current_instance_id = response.body.delete("i-")
+      end
+
+    rescue HTTPClient::TimeoutError
+      cloud_error("Timed out reading instance metadata, " \
+                  "please make sure CPI is running on EC2 instance")
+    end
+
+    def find_device(vd_name)
+      xvd_name = vd_name.gsub(/^\/dev\/vd/, "/dev/xvd")
+
+      DEVICE_POLL_TIMEOUT.times do
+        if File.blockdev?(vd_name)
+          return vd_name
+        elsif File.blockdev?(xvd_name)
+          return xvd_name
+        end
+        sleep(1)
+      end
+
+      cloud_error("Cannot find OpenStack volume on current instance")
+    end
+
+    def unpack_image(tmp_dir, image_path)
+      output = `tar -C #{tmp_dir} -xzf #{image_path} 2>&1`
+      if $?.exitstatus != 0
+        cloud_error("Failed to unpack stemcell root image" \
+                    "tar exit status #{$?.exitstatus}: #{output}")
+      end
+
+      root_image = File.join(tmp_dir, "root.img")
+      unless File.exists?(root_image)
+        cloud_error("Root image is missing from stemcell archive")
+      end
+    end
+
+    def copy_root_image(dir, device_name)
+      Dir.chdir(dir) do
+        dd_out = `dd if=root.img of=#{device_name} 2>&1`
+        if $?.exitstatus != 0
+          cloud_error("Unable to copy stemcell root image, " \
+                      "dd exit status #{$?.exitstatus}: " \
+                      "#{dd_out}")
+        end
+      end
     end
 
     ##
@@ -507,75 +580,6 @@ module Bosh::OpenStackCloud
           @options["registry"]["password"]
         raise ArgumentError, "Invalid registry configuration parameters"
       end
-    end
-
-    # TODO
-
-    ##
-    # Reads current instance id from EC2 metadata. We are assuming
-    # instance id cannot change while current process is running
-    # and thus memoizing it.
-    def current_instance_id
-      @metadata_lock.synchronize do
-        return @current_instance_id if @current_instance_id
-
-        client = HTTPClient.new
-        client.connect_timeout = METADATA_TIMEOUT
-        # Using 169.254.169.254 is an EC2 convention for getting
-        # instance metadata
-        uri = "http://169.254.169.254/1.0/meta-data/instance-id/"
-
-        response = client.get(uri)
-        unless response.status == 200
-          cloud_error("Instance metadata endpoint returned " \
-                      "HTTP #{response.status}")
-        end
-
-        @current_instance_id = response.body
-      end
-
-    rescue HTTPClient::TimeoutError
-      cloud_error("Timed out reading instance metadata, " \
-                  "please make sure CPI is running on EC2 instance")
-    end
-
-    def unpack_image(tmp_dir, image_path)
-      output = `tar -C #{tmp_dir} -xzf #{image_path} 2>&1`
-      if $?.exitstatus != 0
-        cloud_error("Failed to unpack stemcell root image" \
-                    "tar exit status #{$?.exitstatus}: #{output}")
-      end
-
-      root_image = File.join(tmp_dir, "root.img")
-      unless File.exists?(root_image)
-        cloud_error("Root image is missing from stemcell archive")
-      end
-    end
-
-    def copy_root_image(dir, ebs_volume)
-      Dir.chdir(dir) do
-        dd_out = `dd if=root.img of=#{ebs_volume} 2>&1`
-        if $?.exitstatus != 0
-          cloud_error("Unable to copy stemcell root image, " \
-                      "dd exit status #{$?.exitstatus}: " \
-                      "#{dd_out}")
-        end
-      end
-    end
-
-    def find_ebs_device(sd_name)
-      xvd_name = sd_name.gsub(/^\/dev\/sd/, "/dev/xvd")
-
-      DEVICE_POLL_TIMEOUT.times do
-        if File.blockdev?(sd_name)
-          return sd_name
-        elsif File.blockdev?(xvd_name)
-          return xvd_name
-        end
-        sleep(1)
-      end
-
-      cloud_error("Cannot find EBS volume on current instance")
     end
 
   end
