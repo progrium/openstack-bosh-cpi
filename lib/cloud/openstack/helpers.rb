@@ -6,50 +6,52 @@ module Bosh::OpenStackCloud
 
     DEFAULT_TIMEOUT = 3600
 
-    ##
+    #
     # Raises CloudError exception
     #
     def cloud_error(message)
-      if @logger
-        @logger.error(message)
-      end
+      @logger.error(message) if @logger
       raise Bosh::Clouds::CloudError, message
     end
 
-    def wait_resource(resource, start_state,
-                      target_state, state_method = :status,
+    #
+    # Waits for a resource to be on a target state
+    #
+    def wait_resource(resource,
+                      resource_id,
+                      start_state,
+                      target_state,
+                      state_method = :get,
                       timeout = DEFAULT_TIMEOUT)
 
       started_at = Time.now
-      state = resource.send(state_method)
-      desc = resource.to_s
+      state = resource.send(state_method, resource_id).status.downcase
+      desc = resource.class.name + " " + resource_id.to_s
 
-      while state == start_state && state != target_state
+      while state != target_state
         duration = Time.now - started_at
 
         if duration > timeout
-          cloud_error("Timed out waiting for #{desc} " \
-                      "to be #{target_state}")
+          cloud_error("Timed out waiting for #{desc} to be #{target_state}")
         end
 
-        if @logger
-          @logger.debug("Waiting for #{desc} " \
-                        "to be #{target_state} (#{duration})")
-        end
+
+        @logger.debug("Waiting for #{desc} to be #{target_state} (#{duration})") if @logger
 
         sleep(1)
 
-        state = resource.send(state_method)
+        resource_state = resource.send(state_method, resource_id)
+        if resource_state.nil?
+          state = target_state
+        else
+          state = resource_state.status.downcase
+        end
       end
 
       if state == target_state
-        if @logger
-          @logger.info("#{desc} is #{target_state} " \
-                       "after #{Time.now - started_at}s")
-        end
+        @logger.info("#{desc} is #{target_state} after #{Time.now - started_at}s") if @logger
       else
-        cloud_error("#{desc} is #{state}, " \
-                    "expected to be #{target_state}")
+        cloud_error("#{desc} is #{state}, expected to be #{target_state}")
       end
     end
   end
