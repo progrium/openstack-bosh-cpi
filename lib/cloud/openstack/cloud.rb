@@ -62,10 +62,10 @@ module Bosh::OpenStackCloud
     end
 
     ##
-    # Creates OpenStack server and waits until it's in running state
+    # Creates an OpenStack server and waits until it's in running state
     # @param [String] agent_id Agent id associated with new VM
     # @param [String] stemcell_id AMI id that will be used
-    #   to power on new instance
+    #   to power on new server
     # @param [Hash] resource_pool Resource pool specification
     # @param [Hash] network_spec Network specification, if it contains
     #  security groups they must be existing
@@ -79,7 +79,7 @@ module Bosh::OpenStackCloud
     #
     # @return [String] created server id
     def create_vm(agent_id, stemcell_id, resource_pool,
-                  network_spec, disk_locality = nil, environment = nil)
+                  network_spec = nil, disk_locality = nil, environment = nil)
       with_thread_name("create_vm(#{agent_id}, ...)") do
         network_configurator = NetworkConfigurator.new(network_spec)
 
@@ -155,7 +155,7 @@ module Bosh::OpenStackCloud
     end
 
     ##
-    # Terminates OpenStack server and waits until it reports as terminated
+    # Terminates an OpenStack server and waits until it reports as terminated
     # @param [String] server_id Running OpenStack server id
     def delete_vm(server_id)
       with_thread_name("delete_vm(#{server_id})") do
@@ -173,7 +173,7 @@ module Bosh::OpenStackCloud
     end
 
     ##
-    # Reboots OpenStack Server
+    # Reboots an OpenStack Server
     # @param [String] server_id Running OpenStack server id
     def reboot_vm(server_id)
       with_thread_name("reboot_vm(#{server_id})") do
@@ -183,7 +183,7 @@ module Bosh::OpenStackCloud
     end
 
     ##
-    # Configures networking an existing OpenStack server
+    # Configures networking on existing OpenStack server
     # @param [String] server_id Running OpenStack server id
     # @param [Hash] network_spec raw network spec passed by director
     def configure_networks(server_id, network_spec)
@@ -247,7 +247,7 @@ module Bosh::OpenStackCloud
     end
 
     ##
-    # Deletes OpenStack volume
+    # Deletes an OpenStack volume
     # @param [String] disk_id volume id
     def delete_disk(disk_id)
       with_thread_name("delete_disk(#{disk_id})") do

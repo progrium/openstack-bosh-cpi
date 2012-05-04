@@ -1,25 +1,20 @@
-# Copyright (c) 2009-2012 VMware, Inc.
+# Copyright (c) 2012 Piston Cloud Computing, Inc.
 
 require File.expand_path("../../spec_helper", __FILE__)
 
-describe Bosh::AwsCloud::Cloud do
+describe Bosh::OpenStackCloud::Cloud do
 
-  before(:each) do
-    @registry = mock_registry
-  end
+  it "deletes an OpenStack server" do
+    server = double("server", :id => "i-foobar")
 
-  it "deletes an EC2 instance" do
-    instance = double("instance", :id => "i-foobar")
-
-    cloud = mock_cloud do |ec2|
-      ec2.instances.stub(:[]).with("i-foobar").and_return(instance)
+    cloud = mock_cloud do |openstack|
+      openstack.servers.stub(:get).with("i-foobar").and_return(server)
     end
 
-    instance.should_receive(:terminate)
-    instance.should_receive(:status).and_return(:deleting)
-    cloud.should_receive(:wait_resource).with(instance, :deleting, :terminated)
+    server.should_receive(:destroy)
+    server.should_receive(:state)
 
-    @registry.should_receive(:delete_settings).with("i-foobar")
+    cloud.should_receive(:wait_resource).with(server, nil, :deleted)
 
     cloud.delete_vm("i-foobar")
   end

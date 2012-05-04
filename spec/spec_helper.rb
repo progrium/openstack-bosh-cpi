@@ -4,6 +4,7 @@ ENV["BUNDLE_GEMFILE"] ||= File.expand_path("../../Gemfile", __FILE__)
 
 require "rubygems"
 require "bundler"
+
 Bundler.setup(:default, :test)
 
 require "rspec"
@@ -22,14 +23,13 @@ os_config.logger.level = Logger::DEBUG
 
 Bosh::Clouds::Config.configure(os_config)
 
-MOCK_AWS_ACCESS_KEY_ID = "foo"
-MOCK_AWS_SECRET_ACCESS_KEY = "bar"
-
 def mock_cloud_options
   {
     "openstack" => {
-      "access_key_id" => MOCK_AWS_ACCESS_KEY_ID,
-      "secret_access_key" => MOCK_AWS_SECRET_ACCESS_KEY
+      "auth_url" => "http://127.0.0.1:5000/v2.0/tokens",
+      "username" => "admin",
+      "api_key" => "nova",
+      "tenant" => "admin"
     },
     "agent" => {
       "foo" => "bar",
@@ -39,57 +39,21 @@ def mock_cloud_options
 end
 
 def make_cloud(options = nil)
-  Bosh::AwsCloud::Cloud.new(options || mock_cloud_options)
-end
-
-def mock_registry(endpoint = "http://registry:3333")
-  registry = mock("registry", :endpoint => endpoint)
-  Bosh::AwsCloud::RegistryClient.stub!(:new).and_return(registry)
-  registry
+  Bosh::OpenStackCloud::Cloud.new(options || mock_cloud_options)
 end
 
 def mock_cloud(options = nil)
-  instances = double("instances")
+  servers = double("servers")
   volumes = double("volumes")
-  images = double("images")
 
-  ec2 = double(AWS::EC2)
+  openstack = double(Fog::Compute)
 
-  ec2.stub(:instances).and_return(instances)
-  ec2.stub(:volumes).and_return(volumes)
-  ec2.stub(:images).and_return(images)
+  openstack.stub(:servers).and_return(servers)
+  openstack.stub(:volumes).and_return(volumes)
 
-  AWS::EC2.stub(:new).and_return(ec2)
+  Fog::Compute.stub(:new).and_return(openstack)
 
-  yield ec2 if block_given?
+  yield openstack if block_given?
 
-  Bosh::AwsCloud::Cloud.new(options || mock_cloud_options)
+  Bosh::OpenStackCloud::Cloud.new(options || mock_cloud_options)
 end
-
-def dynamic_network_spec
-  { "type" => "dynamic" }
-end
-
-def vip_network_spec
-  {
-    "type" => "vip",
-    "ip" => "10.0.0.1"
-  }
-end
-
-def combined_network_spec
-  {
-    "network_a" => dynamic_network_spec,
-    "network_b" => vip_network_spec
-  }
-end
-
-def resource_pool_spec
-  {
-    "key_name" => "test_key",
-    "availability_zone" => "foobar-1a",
-    "instance_type" => "m3.zb"
-  }
-end
-
-
