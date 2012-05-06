@@ -90,3 +90,11 @@ def combined_network_spec
     "network_b" => vip_network_spec
   }
 end
+
+def resource_pool_spec
+  {
+    "key_name" => "test_key",
+    "availability_zone" => "foobar-1a",
+    "instance_type" => "m1.tiny"
+  }
+end
