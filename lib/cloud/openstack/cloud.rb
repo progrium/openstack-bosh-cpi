@@ -273,8 +273,7 @@ module Bosh::OpenStackCloud
     ##
     # Creates a new OpenStack volume
     # @param [Integer] size disk size in MiB
-    # @param [optional, String] server_id vm id
-    #        of the VM that this disk will be attached to
+    # @param [optional, String] server_id vm id of the VM that this disk will be attached to
     # @return [String] created OpenStack volume id
     def create_disk(size, server_id = nil)
       with_thread_name("create_disk(#{size}, #{server_id})") do
@@ -323,7 +322,7 @@ module Bosh::OpenStackCloud
         volume = @openstack.volumes.get(disk_id)
         state = volume.status
 
-        cloud_error("Cannot delete volume `#{disk_id}', state is #{state}") if state.downcase != "available"
+        cloud_error("Cannot delete volume `#{disk_id}', state is #{state}") if state.to_sym != :available
 
         @logger.info("Deleting volume `#{disk_id}', state is `#{state}'")
         volume.destroy

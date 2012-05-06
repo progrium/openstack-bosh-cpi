@@ -23,7 +23,7 @@ module Bosh::OpenStackCloud
       state = resource.send(state_method)
       desc = resource.class.name.split("::").last.to_s + " " + resource.id.to_s
 
-      while state != target_state
+      while state.to_sym != target_state
         duration = Time.now - started_at
 
         if duration > timeout
