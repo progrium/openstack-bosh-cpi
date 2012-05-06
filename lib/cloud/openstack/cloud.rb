@@ -102,7 +102,7 @@ module Bosh::OpenStackCloud
             state = image.status
 
             @logger.info("Creating new image `#{image.id}', state is `#{state}'")
-            wait_resource(@openstack.images, image.id, state, "deleted")
+            wait_resource(images, state, :deleted)
 
             image.id
           end
@@ -209,7 +209,7 @@ module Bosh::OpenStackCloud
         state = server.state
 
         @logger.info("Creating new server `#{server.id}', state is `#{state}'")
-        wait_resource(@openstack.servers, server.id, state, "active")
+        wait_resource(server, state, :active, :state)
 
         @logger.info("Configuring network for `#{server.id}'")
         network_configurator.configure(@openstack, server)
@@ -233,7 +233,7 @@ module Bosh::OpenStackCloud
 
         @logger.info("Deleting server `#{server.id}', state is `#{state}'")
         server.destroy
-        wait_resource(@openstack.servers, server_id, state, "terminated")
+        wait_resource(server, state, :terminated, :state)
 
         @logger.info("Deleting server settings for `#{server.id}'")
         # TODO uncomment to test registry
@@ -309,7 +309,7 @@ module Bosh::OpenStackCloud
         state = volume.status
 
         @logger.info("Creating new volume `#{volume.id}', state is `#{state}'")
-        wait_resource(@openstack.volumes, volume.id, state, "available")
+        wait_resource(volume, state, :available)
 
         volume.id
       end
@@ -327,7 +327,7 @@ module Bosh::OpenStackCloud
 
         @logger.info("Deleting volume `#{disk_id}', state is `#{state}'")
         volume.destroy
-        wait_resource(@openstack.volumes, disk_id, state, "deleted")
+        wait_resource(volume, state, :deleted)
       end
     end
 
@@ -432,7 +432,7 @@ module Bosh::OpenStackCloud
 
       @logger.info("Soft rebooting server `#{server.id}', state is `#{state}'")
       server.reboot
-      wait_resource(@openstack.servers, server.id, state, "active")
+      wait_resource(server, state, :active, :state)
     end
 
     ##
@@ -443,7 +443,7 @@ module Bosh::OpenStackCloud
 
       @logger.info("Hard rebooting server `#{server.id}', state is `#{state}'")
       server.reboot(type = 'HARD')
-      wait_resource(@openstack.servers, server.id, state, "active")
+      wait_resource(server, state, :active, :state)
     end
 
     ##
