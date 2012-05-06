@@ -19,11 +19,15 @@ describe Bosh::OpenStackCloud::Cloud do
 
   it "soft reboots an OpenStack server" do
     @server.should_receive(:reboot)
+    @server.should_receive(:state).and_return(:reboot)
+    @cloud.should_receive(:wait_resource).with(@server, :reboot, :active, :state)
     @cloud.send(:soft_reboot, @server)
   end
 
   it "hard reboots an OpenStack server" do
     @server.should_receive(:reboot)
+    @server.should_receive(:state).and_return(:reboot)
+    @cloud.should_receive(:wait_resource).with(@server, :reboot, :active, :state)
     @cloud.send(:hard_reboot, @server)
   end
 

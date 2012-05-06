@@ -20,7 +20,7 @@ module Bosh::OpenStackCloud
     def wait_resource(resource, start_state, target_state, state_method = :status, timeout = DEFAULT_TIMEOUT)
 
       started_at = Time.now
-      state = resource.send(state_method)
+      state = resource.send(state_method).downcase
       desc = resource.class.name.split("::").last.to_s + " " + resource.id.to_s
 
       while state.to_sym != target_state
@@ -37,7 +37,7 @@ module Bosh::OpenStackCloud
         if resource.reload.nil?
           state = target_state
         else
-          state = resource.send(state_method)
+          state = resource.send(state_method).downcase
         end
       end
 

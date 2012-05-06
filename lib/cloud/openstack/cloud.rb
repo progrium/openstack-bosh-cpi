@@ -424,7 +424,7 @@ module Bosh::OpenStackCloud
     end
 
     ##
-    # Soft reboots OpenStack server
+    # Soft reboots an OpenStack server
     # @param [Fog::Compute::OpenStack::Server] server OpenStack server
     def soft_reboot(server)
       state = server.state
@@ -435,7 +435,7 @@ module Bosh::OpenStackCloud
     end
 
     ##
-    # Hard reboots OpenStack server
+    # Hard reboots an OpenStack server
     # @param [Fog::Compute::OpenStack::Server] server OpenStack server
     def hard_reboot(server)
       state = server.state
