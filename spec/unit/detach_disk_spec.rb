@@ -19,7 +19,9 @@ describe Bosh::OpenStackCloud::Cloud do
       openstack.should_receive(:get_server_volumes).and_return(volume_attachments)
     end
 
+    volume.should_receive(:status).and_return(:"in-use")
     volume.should_receive(:detach).with(server.id, "v-foobar").and_return(true)
+    cloud.should_receive(:wait_resource).with(volume, :"in-use", :available)
 
     old_settings = {
       "foo" => "bar",

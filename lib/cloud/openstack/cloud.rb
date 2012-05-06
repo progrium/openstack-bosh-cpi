@@ -460,7 +460,10 @@ module Bosh::OpenStackCloud
           @logger.warn("`#{dev_name}' on `#{server.id}' is taken")
           next
         end
+        @logger.info("Attaching volume `#{volume.id}' to `#{server.id}', device name is `#{dev_name}'")
         if volume.attach(server.id, dev_name)
+          state = volume.status
+          wait_resource(volume, state, :"in-use")
           new_attachment = dev_name
         end
         break
@@ -470,8 +473,6 @@ module Bosh::OpenStackCloud
         cloud_error("Server has too many disks attached")
       end
 
-      @logger.info("Attached `#{volume.id}' to `#{server.id}', device name is `#{new_attachment}'")
-      # TODO wait_resource?
       new_attachment
     end
 
@@ -487,9 +488,10 @@ module Bosh::OpenStackCloud
         cloud_error("Disk `#{volume.id}' is not attached to server `#{server.id}'")
       end
 
+      state = volume.status
+      @logger.info("Detaching volume `#{volume.id}' from `#{server.id}', state is `#{state}'")
       volume.detach(server.id, volume.id)
-
-      @logger.info("Detached `#{volume.id}' from `#{server.id}'")
+      wait_resource(volume, state, :available)
     end
 
     ##
