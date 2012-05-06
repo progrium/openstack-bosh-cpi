@@ -29,5 +29,6 @@ require "cloud/openstack/vip_network"
 module Bosh
   module Clouds
     OpenStack = Bosh::OpenStackCloud::Cloud
+    Openstack = OpenStack # Alias needed for Bosh::Clouds::Provider.create method
   end
 end
