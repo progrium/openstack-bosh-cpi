@@ -236,8 +236,7 @@ module Bosh::OpenStackCloud
         wait_resource(server, state, :terminated, :state)
 
         @logger.info("Deleting server settings for `#{server.id}'")
-        # TODO uncomment to test registry
-        #@registry.delete_settings(server.id)
+        @registry.delete_settings(server.id)
       end
     end
 
