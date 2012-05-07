@@ -4,7 +4,7 @@ require File.expand_path("../../spec_helper", __FILE__)
 
 describe Bosh::OpenStackCloud::Cloud do
 
-  it "deregisters EC2 image" do
+  it "deregisters OpenStack image" do
     image = double("image", :id => "i-foo")
 
     cloud = mock_cloud do |openstack|
