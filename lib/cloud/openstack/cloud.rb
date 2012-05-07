@@ -378,7 +378,7 @@ module Bosh::OpenStackCloud
 
     ##
     # Generates initial agent settings. These settings will be read by agent
-    # from OpenStack registry (also a BOSH component) on a target instance. Disk
+    # from OpenStack registry (also a BOSH component) on a target server. Disk
     # conventions for OpenStack are:
     # system disk: /dev/vda
     # OpenStack volumes can be configured to map to other device names later (vdb
@@ -494,8 +494,8 @@ module Bosh::OpenStackCloud
     end
 
     ##
-    # Reads current instance id from OpenStack metadata. We are assuming
-    # instance id cannot change while current process is running
+    # Reads current server id from OpenStack metadata. We are assuming
+    # server id cannot change while current process is running
     # and thus memoizing it.
     def current_instance_id
       @metadata_lock.synchronize do
@@ -504,7 +504,7 @@ module Bosh::OpenStackCloud
         client = HTTPClient.new
         client.connect_timeout = METADATA_TIMEOUT
         # Using 169.254.169.254 is an OpenStack convention for getting
-        # instance metadata
+        # server metadata
         uri = "http://169.254.169.254/1.0/meta-data/instance-id/"
 
         response = client.get(uri)

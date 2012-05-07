@@ -4,13 +4,16 @@ require File.expand_path("../../spec_helper", __FILE__)
 
 describe Bosh::OpenStackCloud::Cloud do
 
-  it "doesn't implement `delete_stemcell'" do
-    cloud = make_cloud
-    expect {
-      cloud.delete_stemcell(nil)
-    }.to raise_error(Bosh::Clouds::NotImplemented,
-                     "`delete_stemcell' is not implemented "\
-                     "by Bosh::OpenStackCloud::Cloud")
+  it "deregisters EC2 image" do
+    image = double("image", :id => "i-foo")
+
+    cloud = mock_cloud do |openstack|
+      openstack.images.stub(:get).with("i-foo").and_return(image)
+    end
+
+    image.should_receive(:destroy)
+
+    cloud.delete_stemcell("i-foo")
   end
 
 end
