@@ -133,19 +133,13 @@ module Bosh::OpenStackCloud
     ##
     # Creates an OpenStack server and waits until it's in running state
     # @param [String] agent_id Agent id associated with new VM
-    # @param [String] stemcell_id AMI id that will be used
-    #   to power on new server
+    # @param [String] stemcell_id AMI id that will be used to power on new server
     # @param [Hash] resource_pool Resource pool specification
-    # @param [Hash] network_spec Network specification, if it contains
-    #  security groups they must be existing
-    # @param [optional, Array] disk_locality List of disks that
-    #   might be attached to this server in the future, can be
-    #   used as a placement hint (i.e. server will only be created
-    #   if resource pool availability zone is the same as disk
-    #   availability zone)
-    # @param [optional, Hash] environment Data to be merged into
-    #   agent settings
-    #
+    # @param [Hash] network_spec Network specification, if it contains security groups they must be existing
+    # @param [optional, Array] disk_locality List of disks that might be attached to this server in the future,
+    #  can be used as a placement hint (i.e. server will only be created if resource pool availability zone is
+    #  the same as disk availability zone)
+    # @param [optional, Hash] environment Data to be merged into agent settings
     # @return [String] created server id
     def create_vm(agent_id, stemcell_id, resource_pool,
                   network_spec = nil, disk_locality = nil, environment = nil)
@@ -216,8 +210,7 @@ module Bosh::OpenStackCloud
 
         @logger.info("Updating server settings for `#{server.id}'")
         settings = initial_agent_settings(agent_id, network_spec, environment)
-        # TODO uncomment to test registry
-        #@registry.update_settings(server.id, settings)
+        @registry.update_settings(server.id, settings)
 
         server.id
       end
