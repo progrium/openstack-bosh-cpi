@@ -12,7 +12,7 @@ Gem::Specification.new do |s|
   s.email        = "info@pistoncloud.com"
   s.homepage     = "http://www.pistoncloud.com"
 
-  s.files        = `git ls-files -- bin/* lib/*`.split("\n") + %w(README Rakefile)
+  s.files        = `git ls-files -- bin/* lib/*`.split("\n") + %w(README.md Rakefile)
   s.test_files   = `git ls-files -- spec/*`.split("\n")
   s.require_path = "lib"
   s.bindir       = "bin"
