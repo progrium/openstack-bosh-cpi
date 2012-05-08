@@ -49,26 +49,54 @@ end
 
 def mock_registry(endpoint = "http://registry:3333")
   registry = mock("registry", :endpoint => endpoint)
-
   Bosh::OpenStackCloud::RegistryClient.stub!(:new).and_return(registry)
-
   registry
 end
 
 def mock_cloud(options = nil)
   servers = double("servers")
   images = double("images")
+  flavors = double("flavors")
   volumes = double("volumes")
+  addresses = double("addresses")
 
   openstack = double(Fog::Compute)
 
   openstack.stub(:servers).and_return(servers)
   openstack.stub(:images).and_return(images)
+  openstack.stub(:flavors).and_return(flavors)
   openstack.stub(:volumes).and_return(volumes)
+  openstack.stub(:addresses).and_return(addresses)
 
   Fog::Compute.stub(:new).and_return(openstack)
 
   yield openstack if block_given?
 
   Bosh::OpenStackCloud::Cloud.new(options || mock_cloud_options)
+end
+
+def dynamic_network_spec
+  { "type" => "dynamic" }
+end
+
+def vip_network_spec
+  {
+    "type" => "vip",
+    "ip" => "10.0.0.1"
+  }
+end
+
+def combined_network_spec
+  {
+    "network_a" => dynamic_network_spec,
+    "network_b" => vip_network_spec
+  }
+end
+
+def resource_pool_spec
+  {
+    "key_name" => "test_key",
+    "availability_zone" => "foobar-1a",
+    "instance_type" => "m1.tiny"
+  }
 end

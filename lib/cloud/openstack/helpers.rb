@@ -17,43 +17,33 @@ module Bosh::OpenStackCloud
     #
     # Waits for a resource to be on a target state
     #
-    def wait_resource(resource,
-                      resource_id,
-                      start_state,
-                      target_state,
-                      state_method = :get,
-                      timeout = DEFAULT_TIMEOUT)
+    def wait_resource(resource, start_state, target_state, state_method = :status, timeout = DEFAULT_TIMEOUT)
 
       started_at = Time.now
-      state = resource.send(state_method, resource_id).status.downcase
-      desc = resource.class.name + " " + resource_id.to_s
+      state = resource.send(state_method).downcase
+      desc = resource.class.name.split("::").last.to_s + " " + resource.id.to_s
 
-      while state != target_state
+      while state.to_sym != target_state
         duration = Time.now - started_at
 
         if duration > timeout
           cloud_error("Timed out waiting for #{desc} to be #{target_state}")
         end
 
-
         @logger.debug("Waiting for #{desc} to be #{target_state} (#{duration})") if @logger
 
         sleep(1)
 
-        resource_state = resource.send(state_method, resource_id)
-        if resource_state.nil?
+        if resource.reload.nil?
           state = target_state
         else
-          state = resource_state.status.downcase
+          state = resource.send(state_method).downcase
         end
       end
 
-      if state == target_state
-        @logger.info("#{desc} is #{target_state} after #{Time.now - started_at}s") if @logger
-      else
-        cloud_error("#{desc} is #{state}, expected to be #{target_state}")
-      end
+      @logger.info("#{desc} is #{target_state} after #{Time.now - started_at}s") if @logger
     end
+
   end
 
 end

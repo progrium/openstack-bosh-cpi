@@ -4,41 +4,31 @@ require File.expand_path("../../spec_helper", __FILE__)
 
 describe Bosh::OpenStackCloud::Cloud do
 
-  it "reboots an OpenStack server (CPI call picks soft reboot)" do
-    server = double("server", :id => "i-foobar")
+  before :each do
+    @server = double("server", :id => "i-foobar")
 
-    cloud = mock_cloud(mock_cloud_options) do |openstack|
-      openstack.servers.stub(:get).with("i-foobar").and_return(server)
+    @cloud = mock_cloud(mock_cloud_options) do |openstack|
+      openstack.servers.stub(:get).with("i-foobar").and_return(@server)
     end
+  end
 
-    cloud.should_receive(:soft_reboot).with(server)
-    cloud.reboot_vm("i-foobar")
+  it "reboots an OpenStack server (CPI call picks soft reboot)" do
+    @cloud.should_receive(:soft_reboot).with(@server)
+    @cloud.reboot_vm("i-foobar")
   end
 
   it "soft reboots an OpenStack server" do
-    server = double("server", :id => "i-foobar")
-
-    cloud = mock_cloud(mock_cloud_options) do |openstack|
-      openstack.servers.stub(:get).with("i-foobar").and_return(server)
-    end
-
-    server.should_receive(:state)
-    server.should_receive(:reboot)
-
-    cloud.send(:soft_reboot, server)
+    @server.should_receive(:reboot)
+    @server.should_receive(:state).and_return(:reboot)
+    @cloud.should_receive(:wait_resource).with(@server, :reboot, :active, :state)
+    @cloud.send(:soft_reboot, @server)
   end
 
   it "hard reboots an OpenStack server" do
-    server = double("server", :id => "i-foobar")
-
-    cloud = mock_cloud(mock_cloud_options) do |openstack|
-      openstack.servers.stub(:get).with("i-foobar").and_return(server)
-    end
-
-    server.should_receive(:state)
-    server.should_receive(:reboot)
-
-    cloud.send(:hard_reboot, server)
+    @server.should_receive(:reboot)
+    @server.should_receive(:state).and_return(:reboot)
+    @cloud.should_receive(:wait_resource).with(@server, :reboot, :active, :state)
+    @cloud.send(:hard_reboot, @server)
   end
 
 end
