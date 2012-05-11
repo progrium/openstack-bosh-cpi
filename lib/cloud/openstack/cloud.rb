@@ -65,9 +65,9 @@ module Bosh::OpenStackCloud
 
           # 1. Create and mount new OpenStack volume (2GB default)
           disk_size = cloud_properties["disk"] || 2048
-          volume_id = create_disk(disk_size, current_instance_id)
+          volume_id = create_disk(disk_size, current_server_id)
           volume = @openstack.volumes.get(volume_id)
-          server = @openstack.servers.get(current_instance_id)
+          server = @openstack.servers.get(current_server_id)
 
           vd_name = attach_volume(server, volume)
           device_name = find_device(vd_name)
@@ -490,9 +490,9 @@ module Bosh::OpenStackCloud
     # Reads current server id from OpenStack metadata. We are assuming
     # server id cannot change while current process is running
     # and thus memoizing it.
-    def current_instance_id
+    def current_server_id
       @metadata_lock.synchronize do
-        return @current_instance_id if @current_instance_id
+        return @current_server_id if @current_server_id
 
         client = HTTPClient.new
         client.connect_timeout = METADATA_TIMEOUT
@@ -502,15 +502,15 @@ module Bosh::OpenStackCloud
 
         response = client.get(uri)
         unless response.status == 200
-          cloud_error("Instance metadata endpoint returned HTTP #{response.status}")
+          cloud_error("Server metadata endpoint returned HTTP #{response.status}")
         end
 
-        @current_instance_id = response.body.delete("i-")
+        @current_server_id = response.body.delete("i-")
       end
 
     rescue HTTPClient::TimeoutError
-      cloud_error("Timed out reading instance metadata, " \
-                  "please make sure CPI is running on EC2 instance")
+      cloud_error("Timed out reading server metadata, " \
+                  "please make sure CPI is running on an OpenStack server")
     end
 
     def find_device(vd_name)
@@ -525,7 +525,7 @@ module Bosh::OpenStackCloud
         sleep(1)
       end
 
-      cloud_error("Cannot find OpenStack volume on current instance")
+      cloud_error("Cannot find OpenStack volume on current server")
     end
 
     def unpack_image(tmp_dir, image_path)
