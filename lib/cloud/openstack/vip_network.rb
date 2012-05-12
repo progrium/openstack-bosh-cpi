@@ -24,7 +24,7 @@ module Bosh::OpenStackCloud
         cloud_error("No IP provided for vip network `#{@name}'")
       end
 
-      @logger.info("Associating instance `#{server.id}' " \
+      @logger.info("Associating server `#{server.id}' " \
                    "with floating IP `#{@ip}'")
 
       # Check if the OpenStack floating IP is allocated. If true, check
