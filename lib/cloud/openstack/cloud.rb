@@ -163,7 +163,7 @@ module Bosh::OpenStackCloud
         image_id = nil
         images = @openstack.images
         images.each do |image|
-          if image.name == stemcell_id
+          if image.id == stemcell_id
             image_id = image.id
             break
           end
