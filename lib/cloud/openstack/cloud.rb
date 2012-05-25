@@ -190,7 +190,7 @@ module Bosh::OpenStackCloud
           :flavor_ref => flavor_id,
           :key_name => resource_pool["key_name"] || @default_key_name,
           :security_groups => security_groups,
-          :metadata => Yajl::Encoder.encode(metadata)
+          :user_data => Yajl::Encoder.encode(metadata)
         }
 
         availability_zone = resource_pool["availability_zone"]
