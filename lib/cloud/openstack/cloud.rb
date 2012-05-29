@@ -286,7 +286,6 @@ module Bosh::OpenStackCloud
       with_thread_name("delete_vm(#{server_id})") do
         server = @openstack.servers.get(server_id)
         @logger.info("Deleting server `#{server_id}'")
-        @logger.debug(server)
         if server
           state = server.state
 
