@@ -222,14 +222,18 @@ module Bosh::OpenStackCloud
     def delete_vm(server_id)
       with_thread_name("delete_vm(#{server_id})") do
         server = @openstack.servers.get(server_id)
-        state = server.state
+        @logger.info("Deleting server `#{server_id}'")
+        @logger.debug(server)
+        if server
+          state = server.state
 
-        @logger.info("Deleting server `#{server.id}', state is `#{state}'")
-        server.destroy
-        wait_resource(server, state, :terminated, :state)
+          @logger.info("Deleting server `#{server.id}', state is `#{state}'")
+          server.destroy
+          wait_resource(server, state, :terminated, :state)
 
-        @logger.info("Deleting server settings for `#{server.id}'")
-        @registry.delete_settings(server.id)
+          @logger.info("Deleting server settings for `#{server.id}'")
+          @registry.delete_settings(server.id)
+        end
       end
     end
 
