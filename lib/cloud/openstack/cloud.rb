@@ -11,6 +11,7 @@ module Bosh::OpenStackCloud
 
     attr_reader :openstack
     attr_reader :registry
+    attr_reader :glance
 
     ##
     # Initialize BOSH OpenStack CPI
@@ -29,6 +30,7 @@ module Bosh::OpenStackCloud
 
       @default_key_name = @openstack_properties["default_key_name"]
       @default_security_groups = @openstack_properties["default_security_groups"]
+      @create_stemcell_image = @openstack_properties["create_stemcell_image"] || "volume"
 
       openstack_params = {
         :provider => "OpenStack",
@@ -38,6 +40,7 @@ module Bosh::OpenStackCloud
         :openstack_tenant => @openstack_properties["tenant"]
       }
       @openstack = Fog::Compute.new(openstack_params)
+      @glance = Fog::Image.new(openstack_params)
 
       registry_endpoint = @registry_properties["endpoint"]
       registry_user = @registry_properties["user"]
@@ -51,11 +54,71 @@ module Bosh::OpenStackCloud
 
     ##
     # Creates a new OpenStack Image using stemcell image.
+    # @param [String] image_path local filesystem path to a stemcell image
+    # @param [Hash] cloud_properties CPI-specific properties
+    def create_stemcell(image_path, cloud_properties)
+      if @create_stemcell_image == "upload"
+        create_stemcell_using_upload(image_path, cloud_properties)
+      else
+        create_stemcell_using_volume(image_path, cloud_properties)
+      end
+    end
+
+
+    ##
+    # Creates a new OpenStack Image using stemcell image.
+    # This method uses direct image upload.
+    # Current implementation of image service loads entire image into memory for upload,
+    # so if this methos is used - make sure that the server has plenty of available memory
+    # @param [String] image_path local filesystem path to a stemcell image
+    # @param [Hash] cloud_properties CPI-specific properties
+    def create_stemcell_using_upload(image_path, cloud_properties)
+      # TODO: refactor into several smaller methods
+      with_thread_name("create_stemcell(#{image_path}...)") do
+        begin
+          Dir.mktmpdir do |tmp_dir|
+            @logger.info("Extracting stemcell to `#{tmp_dir}'")
+
+            # 1. Unpack image to temp directory
+            unpack_image(tmp_dir, image_path)
+            root_image = File.join(tmp_dir, "root.img")
+
+            # 2. Upload image using Glance service
+            image_params = {
+                :name => "BOSH-#{generate_unique_name}",
+                :disk_format => "ami",
+                :container_format => "ami",
+                :properties => {
+                    :kernel_id => cloud_properties["kernel_id"],
+                    :ramdisk_id => cloud_properties["ramdisk_id"],
+                },
+                :location => root_image,
+                :is_public => true
+            }
+
+            @logger.info("Creating new image...")
+            image = @glance.images.create(image_params)
+            state = image.status
+
+            @logger.info("Creating new image `#{image.id}', state is `#{state}'")
+            wait_resource(image, state, :active)
+
+            image.id
+          end
+        rescue => e
+          @logger.error(e)
+          raise e
+        end
+      end
+    end
+
+    ##
+    # Creates a new OpenStack Image using stemcell image.
     # This method can only be run on an OpenStack server, as image creation
     # involves creating and mounting a new OpenStack volume as local block device.
     # @param [String] image_path local filesystem path to a stemcell image
     # @param [Hash] cloud_properties CPI-specific properties
-    def create_stemcell(image_path, cloud_properties)
+    def create_stemcell_using_volume(image_path, cloud_properties)
       # TODO: refactor into several smaller methods
       with_thread_name("create_stemcell(#{image_path}...)") do
         begin
@@ -163,7 +226,7 @@ module Bosh::OpenStackCloud
         image_id = nil
         images = @openstack.images
         images.each do |image|
-          if image.name == stemcell_id
+          if image.id == stemcell_id
             image_id = image.id
             break
           end
@@ -190,7 +253,7 @@ module Bosh::OpenStackCloud
           :flavor_ref => flavor_id,
           :key_name => resource_pool["key_name"] || @default_key_name,
           :security_groups => security_groups,
-          :metadata => Yajl::Encoder.encode(metadata)
+          :user_data => Yajl::Encoder.encode(metadata)
         }
 
         availability_zone = resource_pool["availability_zone"]
@@ -222,14 +285,17 @@ module Bosh::OpenStackCloud
     def delete_vm(server_id)
       with_thread_name("delete_vm(#{server_id})") do
         server = @openstack.servers.get(server_id)
-        state = server.state
+        @logger.info("Deleting server `#{server_id}'")
+        if server
+          state = server.state
 
-        @logger.info("Deleting server `#{server.id}', state is `#{state}'")
-        server.destroy
-        wait_resource(server, state, :terminated, :state)
+          @logger.info("Deleting server `#{server.id}', state is `#{state}'")
+          server.destroy
+          wait_resource(server, state, :terminated, :state)
 
-        @logger.info("Deleting server settings for `#{server.id}'")
-        @registry.delete_settings(server.id)
+          @logger.info("Deleting server settings for `#{server.id}'")
+          @registry.delete_settings(server.id)
+        end
       end
     end
 
@@ -391,6 +457,7 @@ module Bosh::OpenStackCloud
         "networks" => network_spec,
         "disks" => {
           "system" => "/dev/vda",
+          "ephemeral" => "/dev/sdb",
           "persistent" => {}
         }
       }
