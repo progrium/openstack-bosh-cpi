@@ -457,7 +457,7 @@ module Bosh::OpenStackCloud
         "networks" => network_spec,
         "disks" => {
           "system" => "/dev/vda",
-          "ephemeral" => "/dev/sdb",
+          "ephemeral" => "/dev/vdb",
           "persistent" => {}
         }
       }
