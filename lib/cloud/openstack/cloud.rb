@@ -440,7 +440,7 @@ module Bosh::OpenStackCloud
     # from OpenStack registry (also a BOSH component) on a target server. Disk
     # conventions for OpenStack are:
     # system disk: /dev/vda
-    # OpenStack volumes can be configured to map to other device names later (vdb
+    # OpenStack volumes can be configured to map to other device names later (vdc
     # through vdz, also some kernels will remap vd* to xvd*).
     #
     # @param [String] agent_id Agent id (will be picked up by agent to
@@ -513,7 +513,7 @@ module Bosh::OpenStackCloud
       device_names = Set.new(volume_attachments.collect! {|v| v["device"] })
       new_attachment = nil
 
-      ("b".."z").each do |char|
+      ("c".."z").each do |char|
         dev_name = "/dev/vd#{char}"
         if device_names.include?(dev_name)
           @logger.warn("`#{dev_name}' on `#{server.id}' is taken")

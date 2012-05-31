@@ -27,8 +27,8 @@ describe Bosh::OpenStackCloud::Cloud do
       "foo" => "bar",
       "disks" => {
         "persistent" => {
-          "v-foobar" => "/dev/vdb",
-          "v-barfoo" => "/dev/vdc"
+          "v-foobar" => "/dev/vdc",
+          "v-barfoo" => "/dev/vdd"
         }
       }
     }
@@ -37,7 +37,7 @@ describe Bosh::OpenStackCloud::Cloud do
       "foo" => "bar",
       "disks" => {
         "persistent" => {
-          "v-barfoo" => "/dev/vdc"
+          "v-barfoo" => "/dev/vdd"
         }
       }
     }
