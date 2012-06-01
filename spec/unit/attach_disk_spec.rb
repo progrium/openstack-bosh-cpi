@@ -12,7 +12,7 @@ describe Bosh::OpenStackCloud::Cloud do
     server = double("server", :id => "i-test")
     volume = double("volume", :id => "v-foobar")
     volume_attachments = double("body", :body => {"volumeAttachments" => []})
-    attachment = double("attachment", :device => "/dev/vdb")
+    attachment = double("attachment", :device => "/dev/vdc")
 
     cloud = mock_cloud do |openstack|
       openstack.servers.should_receive(:get).with("i-test").and_return(server)
@@ -20,7 +20,7 @@ describe Bosh::OpenStackCloud::Cloud do
       openstack.should_receive(:get_server_volumes).and_return(volume_attachments)
     end
 
-    volume.should_receive(:attach).with(server.id, "/dev/vdb").and_return(attachment)
+    volume.should_receive(:attach).with(server.id, "/dev/vdc").and_return(attachment)
     volume.should_receive(:status).and_return(:available)
     cloud.should_receive(:wait_resource).with(volume, :available, :"in-use")
 
@@ -29,7 +29,7 @@ describe Bosh::OpenStackCloud::Cloud do
       "foo" => "bar",
       "disks" => {
         "persistent" => {
-          "v-foobar" => "/dev/vdb"
+          "v-foobar" => "/dev/vdc"
         }
       }
     }
@@ -43,7 +43,7 @@ describe Bosh::OpenStackCloud::Cloud do
   it "picks available device name" do
     server = double("server", :id => "i-test")
     volume = double("volume", :id => "v-foobar")
-    volume_attachments = double("body", :body => {"volumeAttachments" => [{"device" => "/dev/vdb"}, {"device" => "/dev/vdc"}]})
+    volume_attachments = double("body", :body => {"volumeAttachments" => [{"device" => "/dev/vdc"}, {"device" => "/dev/vdd"}]})
     attachment = double("attachment", :device => "/dev/vdd")
 
     cloud = mock_cloud do |openstack|
@@ -52,7 +52,7 @@ describe Bosh::OpenStackCloud::Cloud do
       openstack.should_receive(:get_server_volumes).and_return(volume_attachments)
     end
 
-    volume.should_receive(:attach).with(server.id, "/dev/vdd").and_return(attachment)
+    volume.should_receive(:attach).with(server.id, "/dev/vde").and_return(attachment)
     volume.should_receive(:status).and_return(:available)
     cloud.should_receive(:wait_resource).with(volume, :available, :"in-use")
 
@@ -61,7 +61,7 @@ describe Bosh::OpenStackCloud::Cloud do
       "foo" => "bar",
       "disks" => {
         "persistent" => {
-          "v-foobar" => "/dev/vdd"
+          "v-foobar" => "/dev/vde"
         }
       }
     }
@@ -72,10 +72,10 @@ describe Bosh::OpenStackCloud::Cloud do
     cloud.attach_disk("i-test", "v-foobar")
   end
 
-  it "raises an error when vdb..vdz are all reserved" do
+  it "raises an error when vdc..vdz are all reserved" do
     server = double("server", :id => "i-test")
     volume = double("volume", :id => "v-foobar")
-    all_mappings = ("b".."z").inject([]) do |array, char|
+    all_mappings = ("c".."z").inject([]) do |array, char|
       array << {"device" => "/dev/vd#{char}"}
       array
     end

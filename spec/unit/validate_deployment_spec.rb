@@ -6,6 +6,7 @@ describe Bosh::OpenStackCloud::Cloud do
 
   it "doesn't implement `validate_deployment'" do
     Fog::Compute.stub(:new)
+    Fog::Image.stub(:new)
     cloud = make_cloud
     expect {
       cloud.validate_deployment({}, {})

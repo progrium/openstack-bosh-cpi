@@ -13,6 +13,7 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
       "networks" => { "network_a" => network_spec },
       "disks" => {
         "system" => "/dev/vda",
+        "ephemeral" => "/dev/vdb",
         "persistent" => {}
       },
       "env" => {
@@ -26,11 +27,11 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
   def openstack_params(user_data, security_groups=[])
     {
       :name=>"agent-id",
-      :image_ref => "i-test",
+      :image_ref => "sc-id",
       :flavor_ref => "f-test",
       :key_name => "test_key",
       :security_groups => security_groups,
-      :metadata => Yajl::Encoder.encode(user_data),
+      :user_data => Yajl::Encoder.encode(user_data),
       :availability_zone => "foobar-1a"
     }
   end
@@ -47,7 +48,7 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
       }
     }
     server = double("server", :id => "i-test")
-    image = double("image", :id => "i-test", :name => "sc-id")
+    image = double("image", :id => "sc-id", :name => "sc-id")
     flavor = double("flavor", :id => "f-test", :name => "m1.tiny")
     address = double("address", :id => "a-test", :ip => "10.0.0.1", :instance_id => "i-test")
 
@@ -83,7 +84,7 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
     network_spec = dynamic_network_spec
     network_spec["cloud_properties"] = { "security_groups" => security_groups }
     server = double("server", :id => "i-test")
-    image = double("image", :id => "i-test", :name => "sc-id")
+    image = double("image", :id => "sc-id", :name => "sc-id")
     flavor = double("flavor", :id => "f-test", :name => "m1.tiny")
     address = double("address", :id => "a-test", :ip => "10.0.0.1", :instance_id => nil)
 
@@ -109,7 +110,7 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
 
   it "associates server with floating ip if vip network is provided" do
     server = double("server", :id => "i-test")
-    image = double("image", :id => "i-test", :name => "sc-id")
+    image = double("image", :id => "sc-id", :name => "sc-id")
     flavor = double("flavor", :id => "f-test", :name => "m1.tiny")
     address = double("address", :id => "a-test", :ip => "10.0.0.1", :instance_id => "i-test")
 

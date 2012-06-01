@@ -60,6 +60,9 @@ def mock_cloud(options = nil)
   volumes = double("volumes")
   addresses = double("addresses")
 
+  glance = double(Fog::Image)
+  Fog::Image.stub(:new).and_return(glance)
+
   openstack = double(Fog::Compute)
 
   openstack.stub(:servers).and_return(servers)
