@@ -212,6 +212,9 @@ module Bosh::OpenStackCloud
         metadata = {
           "registry" => {
             "endpoint" => @registry.endpoint
+          },
+          "agent" => {
+            "id" => agent_id
           }
         }
 
@@ -273,7 +276,7 @@ module Bosh::OpenStackCloud
 
         @logger.info("Updating server settings for `#{server.id}'")
         settings = initial_agent_settings(agent_id, network_spec, environment)
-        @registry.update_settings(server.id, settings)
+        @registry.update_settings(server.name, settings)
 
         server.id
       end
@@ -294,7 +297,7 @@ module Bosh::OpenStackCloud
           wait_resource(server, state, :terminated, :state)
 
           @logger.info("Deleting server settings for `#{server.id}'")
-          @registry.delete_settings(server.id)
+          @registry.delete_settings(server.name)
         end
       end
     end
@@ -473,9 +476,9 @@ module Bosh::OpenStackCloud
 
       # TODO uncomment to test registry
       @logger.info("Updating server settings for `#{server.id}'")
-      settings = @registry.read_settings(server.id)
+      settings = @registry.read_settings(server.name)
       yield settings
-      @registry.update_settings(server.id, settings)
+      @registry.update_settings(server.name, settings)
     end
 
     def generate_unique_name

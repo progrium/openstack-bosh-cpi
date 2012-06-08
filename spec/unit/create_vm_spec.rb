@@ -45,9 +45,12 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
     user_data = {
       "registry" => {
         "endpoint" => "http://registry:3333"
+      },
+      "agent" => {
+        "id" => "agent-id"
       }
     }
-    server = double("server", :id => "i-test")
+    server = double("server", :id => "i-test", :name => "i-test")
     image = double("image", :id => "sc-id", :name => "sc-id")
     flavor = double("flavor", :id => "f-test", :name => "m1.tiny")
     address = double("address", :id => "a-test", :ip => "10.0.0.1", :instance_id => "i-test")
@@ -78,12 +81,15 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
     user_data = {
       "registry" => {
         "endpoint" => "http://registry:3333"
+      },
+      "agent" => {
+        "id" => "agent-id"
       }
     }
     security_groups = %w[foo bar]
     network_spec = dynamic_network_spec
     network_spec["cloud_properties"] = { "security_groups" => security_groups }
-    server = double("server", :id => "i-test")
+    server = double("server", :id => "i-test", :name => "i-test")
     image = double("image", :id => "sc-id", :name => "sc-id")
     flavor = double("flavor", :id => "f-test", :name => "m1.tiny")
     address = double("address", :id => "a-test", :ip => "10.0.0.1", :instance_id => nil)
@@ -109,7 +115,7 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
   end
 
   it "associates server with floating ip if vip network is provided" do
-    server = double("server", :id => "i-test")
+    server = double("server", :id => "i-test", :name => "i-test")
     image = double("image", :id => "sc-id", :name => "sc-id")
     flavor = double("flavor", :id => "f-test", :name => "m1.tiny")
     address = double("address", :id => "a-test", :ip => "10.0.0.1", :instance_id => "i-test")

@@ -9,7 +9,7 @@ describe Bosh::OpenStackCloud::Cloud do
   end
 
   it "attaches an OpenStack volume to a server" do
-    server = double("server", :id => "i-test")
+    server = double("server", :id => "i-test", :name => "i-test")
     volume = double("volume", :id => "v-foobar")
     volume_attachments = double("body", :body => {"volumeAttachments" => []})
     attachment = double("attachment", :device => "/dev/vdc")
@@ -41,7 +41,7 @@ describe Bosh::OpenStackCloud::Cloud do
   end
 
   it "picks available device name" do
-    server = double("server", :id => "i-test")
+    server = double("server", :id => "i-test", :name => "i-test")
     volume = double("volume", :id => "v-foobar")
     volume_attachments = double("body", :body => {"volumeAttachments" => [{"device" => "/dev/vdc"}, {"device" => "/dev/vdd"}]})
     attachment = double("attachment", :device => "/dev/vdd")
@@ -73,7 +73,7 @@ describe Bosh::OpenStackCloud::Cloud do
   end
 
   it "raises an error when vdc..vdz are all reserved" do
-    server = double("server", :id => "i-test")
+    server = double("server", :id => "i-test", :name => "i-test")
     volume = double("volume", :id => "v-foobar")
     all_mappings = ("c".."z").inject([]) do |array, char|
       array << {"device" => "/dev/vd#{char}"}

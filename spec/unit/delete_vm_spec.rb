@@ -9,7 +9,7 @@ describe Bosh::OpenStackCloud::Cloud do
    end
 
   it "deletes an OpenStack server" do
-    server = double("server", :id => "i-foobar")
+    server = double("server", :id => "i-foobar", :name => "i-foobar")
 
     cloud = mock_cloud do |openstack|
       openstack.servers.should_receive(:get).with("i-foobar").and_return(server)
