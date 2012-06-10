@@ -442,7 +442,7 @@ module Bosh::OpenStackCloud
     # Generates initial agent settings. These settings will be read by agent
     # from OpenStack registry (also a BOSH component) on a target server. Disk
     # conventions for OpenStack are:
-    # system disk: /dev/sda
+    # system disk: /dev/vda
     # OpenStack volumes can be configured to map to other device names later (vdc
     # through vdz, also some kernels will remap vd* to xvd*).
     #
@@ -459,8 +459,8 @@ module Bosh::OpenStackCloud
         "agent_id" => agent_id,
         "networks" => network_spec,
         "disks" => {
-          "system" => "/dev/sda",
-          "ephemeral" => "/dev/sdb",
+          "system" => "/dev/vda",
+          "ephemeral" => "/dev/vdb",
           "persistent" => {}
         }
       }
