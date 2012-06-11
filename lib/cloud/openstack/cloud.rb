@@ -209,12 +209,13 @@ module Bosh::OpenStackCloud
       with_thread_name("create_vm(#{agent_id}, ...)") do
         network_configurator = NetworkConfigurator.new(network_spec)
 
+        server_name = "vm-#{generate_unique_name}"
         metadata = {
           "registry" => {
             "endpoint" => @registry.endpoint
           },
-          "agent" => {
-            "id" => agent_id
+          "server" => {
+            "name" => server_name
           }
         }
 
@@ -251,7 +252,7 @@ module Bosh::OpenStackCloud
         end
 
         server_params = {
-          :name => agent_id,
+          :name => server_name,
           :image_ref => image_id,
           :flavor_ref => flavor_id,
           :key_name => resource_pool["key_name"] || @default_key_name,
@@ -275,7 +276,7 @@ module Bosh::OpenStackCloud
         network_configurator.configure(@openstack, server)
 
         @logger.info("Updating server settings for `#{server.id}'")
-        settings = initial_agent_settings(agent_id, network_spec, environment)
+        settings = initial_agent_settings(server_name, agent_id, network_spec, environment)
         @registry.update_settings(server.name, settings)
 
         server.id
@@ -451,10 +452,10 @@ module Bosh::OpenStackCloud
     # @param [Hash] network_spec Agent network spec
     # @param [Hash] environment
     # @return [Hash]
-    def initial_agent_settings(agent_id, network_spec, environment)
+    def initial_agent_settings(server_name, agent_id, network_spec, environment)
       settings = {
         "vm" => {
-          "name" => "vm-#{generate_unique_name}"
+          "name" => server_name
         },
         "agent_id" => agent_id,
         "networks" => network_spec,

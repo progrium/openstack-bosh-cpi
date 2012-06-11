@@ -24,9 +24,9 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
     }
   end
 
-  def openstack_params(user_data, security_groups=[])
+  def openstack_params(unique_name, user_data, security_groups=[])
     {
-      :name=>"agent-id",
+      :name=>"vm-#{unique_name}",
       :image_ref => "sc-id",
       :flavor_ref => "f-test",
       :key_name => "test_key",
@@ -46,8 +46,8 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
       "registry" => {
         "endpoint" => "http://registry:3333"
       },
-      "agent" => {
-        "id" => "agent-id"
+      "server" => {
+        "name" => "vm-#{unique_name}"
       }
     }
     server = double("server", :id => "i-test", :name => "i-test")
@@ -56,7 +56,7 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
     address = double("address", :id => "a-test", :ip => "10.0.0.1", :instance_id => "i-test")
 
     cloud = mock_cloud do |openstack|
-      openstack.servers.should_receive(:create).with(openstack_params(user_data)).and_return(server)
+      openstack.servers.should_receive(:create).with(openstack_params(unique_name, user_data)).and_return(server)
       openstack.images.should_receive(:each).and_yield(image)
       openstack.flavors.should_receive(:each).and_yield(flavor)
       openstack.addresses.should_receive(:each).and_yield(address)
@@ -82,8 +82,8 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
       "registry" => {
         "endpoint" => "http://registry:3333"
       },
-      "agent" => {
-        "id" => "agent-id"
+      "server" => {
+        "name" => "vm-#{unique_name}"
       }
     }
     security_groups = %w[foo bar]
@@ -95,7 +95,7 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
     address = double("address", :id => "a-test", :ip => "10.0.0.1", :instance_id => nil)
 
     cloud = mock_cloud do |openstack|
-      openstack.servers.should_receive(:create).with(openstack_params(user_data, security_groups)).and_return(server)
+      openstack.servers.should_receive(:create).with(openstack_params(unique_name, user_data, security_groups)).and_return(server)
       openstack.images.should_receive(:each).and_yield(image)
       openstack.flavors.should_receive(:each).and_yield(flavor)
       openstack.addresses.should_receive(:each).and_yield(address)
