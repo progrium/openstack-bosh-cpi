@@ -612,15 +612,42 @@ module Bosh::OpenStackCloud
       end
     end
 
+    # This method ties to execute the helper script stemcell-copy
+    # as root using sudo, since it needs to write to the volume.
+    # If stemcell-copy isn't available, it falls back to writing directly
+    # to the device, which is used in the micro bosh deployer.
+    # The stemcell-copy script must be in the PATH of the user running
+    # the director, and needs sudo privileges to execute without
+    # password.
     def copy_root_image(dir, device_name)
       Dir.chdir(dir) do
-        dd_out = `dd if=root.img of=#{device_name} 2>&1`
-        if $?.exitstatus != 0
+        path = ENV["PATH"]
+
+        if stemcell_copy = has_stemcell_copy(path)
+          @logger.debug("copying stemcell using stemcell-copy script")
+          # note that is is a potentially dangerous operation, but as the
+          # stemcell-copy script sets PATH to a sane value this is safe
+          out = `sudo #{stemcell_copy} #{device_name} 2>&1`
+        else
+          @logger.info("falling back to using dd to copy stemcell")
+          out = `dd if=root.img of=#{device_name} 2>&1`
+        end
+
+        unless $?.exitstatus == 0
           cloud_error("Unable to copy stemcell root image, " \
-                      "dd exit status #{$?.exitstatus}: " \
-                      "#{dd_out}")
+                      "exit status #{$?.exitstatus}: #{out}")
         end
       end
+    end
+
+    # checks if the stemcell-copy script can be found in
+    # the current PATH
+    def has_stemcell_copy(path)
+      path.split(":").each do |dir|
+        stemcell_copy = File.join(dir, "stemcell-copy")
+        return stemcell_copy if File.exist?(stemcell_copy)
+      end
+      nil
     end
 
     ##

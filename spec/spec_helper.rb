@@ -23,6 +23,20 @@ os_config.logger.level = Logger::DEBUG
 
 Bosh::Clouds::Config.configure(os_config)
 
+def internal_to(*args, &block)
+  example = describe *args, &block
+  klass = args[0]
+  if klass.is_a? Class
+    saved_private_instance_methods = klass.private_instance_methods
+    example.before do
+      klass.class_eval { public *saved_private_instance_methods }
+    end
+    example.after do
+      klass.class_eval { private *saved_private_instance_methods }
+    end
+  end
+end
+
 def mock_cloud_options
   {
     "openstack" => {
