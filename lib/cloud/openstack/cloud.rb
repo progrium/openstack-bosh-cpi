@@ -89,8 +89,8 @@ module Bosh::OpenStackCloud
                 :disk_format => "ami",
                 :container_format => "ami",
                 :properties => {
-                    :kernel_id => cloud_properties["kernel_id"],
-                    :ramdisk_id => cloud_properties["ramdisk_id"],
+                  :kernel_id => cloud_properties["kernel_id"],
+                  :ramdisk_id => cloud_properties["ramdisk_id"],
                 },
                 :location => root_image,
                 :is_public => true
@@ -143,29 +143,35 @@ module Bosh::OpenStackCloud
             copy_root_image(tmp_dir, device_name)
 
             # 3. Create snapshot and then an image using this snapshot
-            snapshot = volume.create_snapshot
-            wait_resource(snapshot, snapshot.status, :completed)
+            snapshot_params = {
+              :name => "snapshot-#{generate_unique_name}",
+              :description => "",
+              :volume_id => volume_id
+            }
+
+            @logger.info("Creating new snapshot...")
+            snapshot = @openstack.snapshots.create(snapshot_params)
+            state = snapshot.status
+
+            @logger.info("Creating new snapshot `#{snapshot.id}', state is `#{state}'")
+            wait_resource(snapshot, state, :available)
 
             image_params = {
               :name => "BOSH-#{generate_unique_name}",
               :disk_format => "ami",
               :container_format => "ami",
-
-              :architecture => "x86_64",
-              :kernel_id => cloud_properties["kernel_id"] || DEFAULT_AKI,
-              :root_device_name => "/dev/sda",
-              :block_device_mappings => {
-                "/dev/sda" => { :snapshot_id => snapshot.id },
-                "/dev/sdb" => "ephemeral0"
-              }
+              :properties => {
+                :kernel_id => cloud_properties["kernel_id"],
+                :ramdisk_id => cloud_properties["ramdisk_id"],
+              },
+              :is_public => true
             }
 
-            @logger.info("Creating new image...")
-            image = @openstack.images.create(image_params)
+            image = @glance.images.create(image_params)
             state = image.status
 
             @logger.info("Creating new image `#{image.id}', state is `#{state}'")
-            wait_resource(images, state, :deleted)
+            wait_resource(image, state, :active)
 
             image.id
           end
