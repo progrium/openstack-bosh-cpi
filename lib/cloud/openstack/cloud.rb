@@ -141,45 +141,42 @@ module Bosh::OpenStackCloud
           device_name = find_device(vd_name)
 
           # 2. Copy image to new OpenStack volume
-          Dir.mktmpdir do |tmp_dir|
-            @logger.info("Extracting stemcell to `#{tmp_dir}'")
+          @logger.info("Copying stemcell disk image to '#{device_name}'")
+          copy_root_image(image_path, device_name)
 
-            unpack_image(tmp_dir, image_path)
-            copy_root_image(tmp_dir, device_name)
+          # 3. Create a volume snapshot and then an image using this snapshot
+          snapshot_params = {
+            :name => "snapshot-#{generate_unique_name}",
+            :description => "",
+            :volume_id => volume_id
+          }
 
-            # 3. Create snapshot and then an image using this snapshot
-            snapshot_params = {
-              :name => "snapshot-#{generate_unique_name}",
-              :description => "",
-              :volume_id => volume_id
-            }
+          @logger.info("Creating new snapshot...")
+          snapshot = @openstack.snapshots.create(snapshot_params)
+          state = snapshot.status
 
-            @logger.info("Creating new snapshot...")
-            snapshot = @openstack.snapshots.create(snapshot_params)
-            state = snapshot.status
+          @logger.info("Creating new snapshot `#{snapshot.id}', state is `#{state}'")
+          wait_resource(snapshot, state, :available)
 
-            @logger.info("Creating new snapshot `#{snapshot.id}', state is `#{state}'")
-            wait_resource(snapshot, state, :available)
+          # TODO creating an image from a volume snapshot is not available in OpenStack
+          image_params = {
+            :name => "BOSH-#{generate_unique_name}",
+            :disk_format => "ami",
+            :container_format => "ami",
+            :properties => {
+              :kernel_id => cloud_properties["kernel_id"],
+              :ramdisk_id => cloud_properties["ramdisk_id"],
+            },
+            :is_public => true
+          }
 
-            image_params = {
-              :name => "BOSH-#{generate_unique_name}",
-              :disk_format => "ami",
-              :container_format => "ami",
-              :properties => {
-                :kernel_id => cloud_properties["kernel_id"],
-                :ramdisk_id => cloud_properties["ramdisk_id"],
-              },
-              :is_public => true
-            }
+          image = @glance.images.create(image_params)
+          state = image.status
 
-            image = @glance.images.create(image_params)
-            state = image.status
+          @logger.info("Creating new image `#{image.id}', state is `#{state}'")
+          wait_resource(image, state, :active)
 
-            @logger.info("Creating new image `#{image.id}', state is `#{state}'")
-            wait_resource(image, state, :active)
-
-            image.id
-          end
+          image.id
         rescue => e
           # TODO: delete snapshot?
           @logger.error(e)
@@ -634,31 +631,29 @@ module Bosh::OpenStackCloud
       end
     end
 
-    # This method ties to execute the helper script stemcell-copy
+    # This method tries to execute the helper script stemcell-copy
     # as root using sudo, since it needs to write to the volume.
     # If stemcell-copy isn't available, it falls back to writing directly
     # to the device, which is used in the micro bosh deployer.
     # The stemcell-copy script must be in the PATH of the user running
     # the director, and needs sudo privileges to execute without
     # password.
-    def copy_root_image(dir, device_name)
-      Dir.chdir(dir) do
-        path = ENV["PATH"]
+    def copy_root_image(image_path, device_name)
+      path = ENV["PATH"]
 
-        if stemcell_copy = has_stemcell_copy(path)
-          @logger.debug("copying stemcell using stemcell-copy script")
-          # note that is is a potentially dangerous operation, but as the
-          # stemcell-copy script sets PATH to a sane value this is safe
-          out = `sudo #{stemcell_copy} #{device_name} 2>&1`
-        else
-          @logger.info("falling back to using dd to copy stemcell")
-          out = `dd if=root.img of=#{device_name} 2>&1`
-        end
+      if stemcell_copy = has_stemcell_copy(path)
+        @logger.debug("copying stemcell using stemcell-copy script")
+        # note that is is a potentially dangerous operation, but as the
+        # stemcell-copy script sets PATH to a sane value this is safe
+        out = `sudo #{stemcell_copy} #{image_path} #{device_name} 2>&1`
+      else
+        @logger.info("falling back to using dd to copy stemcell")
+        out = `tar -xzf #{image_path} -O root.img | dd of=#{device_name} 2>&1`
+      end
 
-        unless $?.exitstatus == 0
-          cloud_error("Unable to copy stemcell root image, " \
-                      "exit status #{$?.exitstatus}: #{out}")
-        end
+      unless $?.exitstatus == 0
+        cloud_error("Unable to copy stemcell root image, " \
+                    "exit status #{$?.exitstatus}: #{out}")
       end
     end
 
