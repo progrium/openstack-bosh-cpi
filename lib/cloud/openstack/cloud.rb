@@ -128,9 +128,14 @@ module Bosh::OpenStackCloud
 
           # 1. Create and mount new OpenStack volume (2GB default)
           disk_size = cloud_properties["disk"] || 2048
-          volume_id = create_disk(disk_size, current_server_id)
+          servers = @openstack.servers.find_by_name(current_server_id)
+          if servers.empty?
+            cloud_error("OpenStack CPI: server #{current_server_id} not found")
+          else
+            server = servers.first
+          end
+          volume_id = create_disk(disk_size, server.id)
           volume = @openstack.volumes.get(volume_id)
-          server = @openstack.servers.get(current_server_id)
 
           vd_name = attach_volume(server, volume)
           device_name = find_device(vd_name)
@@ -575,14 +580,25 @@ module Bosh::OpenStackCloud
         client.connect_timeout = METADATA_TIMEOUT
         # Using 169.254.169.254 is an OpenStack convention for getting
         # server metadata
-        uri = "http://169.254.169.254/1.0/meta-data/instance-id/"
+        uri = "http://169.254.169.254/1.0/user-data"
 
-        response = client.get(uri)
+        headers = {"Accept" => "application/json"}
+        response = client.get(uri, {}, headers)
         unless response.status == 200
           cloud_error("Server metadata endpoint returned HTTP #{response.status}")
         end
 
-        @current_server_id = response.body.delete("i-")
+        user_data = Yajl::Parser.parse(response.body)
+        unless user_data.is_a?(Hash)
+          cloud_error("Invalid response from #{uri} , Hash expected, " \
+                      "got #{response.body.class}: #{response.body}")
+        end
+
+        unless user_data.has_key?("server") &&
+               user_data["server"].has_key?("name")
+          cloud_error("Cannot parse user data for endpoint #{user_data.inspect}")
+        end
+        @current_server_id = user_data["server"]["name"]
       end
 
     rescue HTTPClient::TimeoutError
