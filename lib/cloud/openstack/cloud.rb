@@ -264,7 +264,7 @@ module Bosh::OpenStackCloud
           :image_ref => image_id,
           :flavor_ref => flavor_id,
           :key_name => resource_pool["key_name"] || @default_key_name,
-          :security_groups => security_groups,
+          :security_groups => security_groups.map { |secgrp| {:name => secgrp} },
           :user_data => Yajl::Encoder.encode(metadata)
         }
 
