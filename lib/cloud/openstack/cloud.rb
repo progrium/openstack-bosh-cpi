@@ -128,7 +128,7 @@ module Bosh::OpenStackCloud
 
           # 1. Create and mount new OpenStack volume (2GB default)
           disk_size = cloud_properties["disk"] || 2048
-          servers = @openstack.servers.find_by_name(current_server_id)
+          servers = @openstack.servers.all(:name => current_server_id)
           if servers.empty?
             cloud_error("OpenStack CPI: server #{current_server_id} not found")
           else
