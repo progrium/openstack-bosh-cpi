@@ -73,6 +73,7 @@ def mock_cloud(options = nil)
   flavors = double("flavors")
   volumes = double("volumes")
   addresses = double("addresses")
+  snapshots = double("snapshots")
 
   glance = double(Fog::Image)
   Fog::Image.stub(:new).and_return(glance)
@@ -84,10 +85,27 @@ def mock_cloud(options = nil)
   openstack.stub(:flavors).and_return(flavors)
   openstack.stub(:volumes).and_return(volumes)
   openstack.stub(:addresses).and_return(addresses)
+  openstack.stub(:snapshots).and_return(snapshots)
 
   Fog::Compute.stub(:new).and_return(openstack)
 
   yield openstack if block_given?
+
+  Bosh::OpenStackCloud::Cloud.new(options || mock_cloud_options)
+end
+
+def mock_glance(options = nil)
+  images = double("images")
+
+  openstack = double(Fog::Compute)
+  Fog::Compute.stub(:new).and_return(openstack)
+
+  glance = double(Fog::Image)
+  glance.stub(:images).and_return(images)
+
+  Fog::Image.stub(:new).and_return(glance)
+
+  yield glance if block_given?
 
   Bosh::OpenStackCloud::Cloud.new(options || mock_cloud_options)
 end

@@ -146,7 +146,7 @@ module Bosh::OpenStackCloud
 
           # 3. Create a volume snapshot and then an image using this snapshot
           snapshot_params = {
-            :name => "snapshot-#{generate_unique_name}",
+            :name => "BOSH-#{generate_unique_name}",
             :description => "",
             :volume_id => volume_id
           }
@@ -158,25 +158,9 @@ module Bosh::OpenStackCloud
           @logger.info("Creating new snapshot `#{snapshot.id}', state is `#{state}'")
           wait_resource(snapshot, state, :available)
 
-          # TODO creating an image from a volume snapshot is not available in OpenStack
-          image_params = {
-            :name => "BOSH-#{generate_unique_name}",
-            :disk_format => "ami",
-            :container_format => "ami",
-            :properties => {
-              :kernel_id => cloud_properties["kernel_id"],
-              :ramdisk_id => cloud_properties["ramdisk_id"],
-            },
-            :is_public => true
-          }
-
-          image = @glance.images.create(image_params)
-          state = image.status
-
-          @logger.info("Creating new image `#{image.id}', state is `#{state}'")
-          wait_resource(image, state, :active)
-
-          image.id
+          # TODO Creating an image from a volume snapshot is not available in OpenStack,
+          # TODO But we can boot a server from volume snapshot!!!
+          cloud_error("Creating a stemcell from a volume is not supported by OpenStack CPI")
         rescue => e
           # TODO: delete snapshot?
           @logger.error(e)
