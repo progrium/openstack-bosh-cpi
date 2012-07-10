@@ -9,7 +9,7 @@ describe Bosh::OpenStackCloud::Cloud do
   end
 
   it "adds floating ip to the server for vip network" do
-    server = double("server", :id => "i-test")
+    server = double("server", :id => "i-test", :name => "i-test")
     address = double("address", :id => "a-test", :ip => "10.0.0.1", :instance_id => nil)
 
     cloud = mock_cloud do |openstack|
@@ -29,7 +29,7 @@ describe Bosh::OpenStackCloud::Cloud do
   end
 
   it "removes floating ip from the server if vip network is gone" do
-    server = double("server", :id => "i-test")
+    server = double("server", :id => "i-test", :name => "i-test")
     address = double("address", :id => "a-test", :ip => "10.0.0.1", :instance_id => "i-test")
 
     cloud = mock_cloud do |openstack|
@@ -49,7 +49,7 @@ describe Bosh::OpenStackCloud::Cloud do
   end
 
   it "performs network sanity check" do
-    server = double("server", :id => "i-test")
+    server = double("server", :id => "i-test", :name => "i-test")
 
     expect {
       cloud = mock_cloud do |openstack|

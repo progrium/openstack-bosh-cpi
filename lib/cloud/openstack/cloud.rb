@@ -89,8 +89,8 @@ module Bosh::OpenStackCloud
                 :disk_format => "ami",
                 :container_format => "ami",
                 :properties => {
-                    :kernel_id => cloud_properties["kernel_id"],
-                    :ramdisk_id => cloud_properties["ramdisk_id"],
+                  :kernel_id => cloud_properties["kernel_id"],
+                  :ramdisk_id => cloud_properties["ramdisk_id"],
                 },
                 :location => root_image,
                 :is_public => true
@@ -128,47 +128,39 @@ module Bosh::OpenStackCloud
 
           # 1. Create and mount new OpenStack volume (2GB default)
           disk_size = cloud_properties["disk"] || 2048
-          volume_id = create_disk(disk_size, current_server_id)
+          servers = @openstack.servers.all(:name => current_server_id)
+          if servers.empty?
+            cloud_error("OpenStack CPI: server #{current_server_id} not found")
+          else
+            server = servers.first
+          end
+          volume_id = create_disk(disk_size, server.id)
           volume = @openstack.volumes.get(volume_id)
-          server = @openstack.servers.get(current_server_id)
 
           vd_name = attach_volume(server, volume)
           device_name = find_device(vd_name)
 
           # 2. Copy image to new OpenStack volume
-          Dir.mktmpdir do |tmp_dir|
-            @logger.info("Extracting stemcell to `#{tmp_dir}'")
+          @logger.info("Copying stemcell disk image to '#{device_name}'")
+          copy_root_image(image_path, device_name)
 
-            unpack_image(tmp_dir, image_path)
-            copy_root_image(tmp_dir, device_name)
+          # 3. Create a volume snapshot and then an image using this snapshot
+          snapshot_params = {
+            :name => "BOSH-#{generate_unique_name}",
+            :description => "",
+            :volume_id => volume_id
+          }
 
-            # 3. Create snapshot and then an image using this snapshot
-            snapshot = volume.create_snapshot
-            wait_resource(snapshot, snapshot.status, :completed)
+          @logger.info("Creating new snapshot...")
+          snapshot = @openstack.snapshots.create(snapshot_params)
+          state = snapshot.status
 
-            image_params = {
-              :name => "BOSH-#{generate_unique_name}",
-              :disk_format => "ami",
-              :container_format => "ami",
+          @logger.info("Creating new snapshot `#{snapshot.id}', state is `#{state}'")
+          wait_resource(snapshot, state, :available)
 
-              :architecture => "x86_64",
-              :kernel_id => cloud_properties["kernel_id"] || DEFAULT_AKI,
-              :root_device_name => "/dev/sda",
-              :block_device_mappings => {
-                "/dev/sda" => { :snapshot_id => snapshot.id },
-                "/dev/sdb" => "ephemeral0"
-              }
-            }
-
-            @logger.info("Creating new image...")
-            image = @openstack.images.create(image_params)
-            state = image.status
-
-            @logger.info("Creating new image `#{image.id}', state is `#{state}'")
-            wait_resource(images, state, :deleted)
-
-            image.id
-          end
+          # TODO Creating an image from a volume snapshot is not available in OpenStack,
+          # TODO But we can boot a server from volume snapshot!!!
+          cloud_error("Creating a stemcell from a volume is not supported by OpenStack CPI")
         rescue => e
           # TODO: delete snapshot?
           @logger.error(e)
@@ -209,9 +201,13 @@ module Bosh::OpenStackCloud
       with_thread_name("create_vm(#{agent_id}, ...)") do
         network_configurator = NetworkConfigurator.new(network_spec)
 
+        server_name = "vm-#{generate_unique_name}"
         metadata = {
           "registry" => {
             "endpoint" => @registry.endpoint
+          },
+          "server" => {
+            "name" => server_name
           }
         }
 
@@ -248,11 +244,11 @@ module Bosh::OpenStackCloud
         end
 
         server_params = {
-          :name => agent_id,
+          :name => server_name,
           :image_ref => image_id,
           :flavor_ref => flavor_id,
           :key_name => resource_pool["key_name"] || @default_key_name,
-          :security_groups => security_groups,
+          :security_groups => security_groups.map { |secgrp| {:name => secgrp} },
           :user_data => Yajl::Encoder.encode(metadata)
         }
 
@@ -272,8 +268,8 @@ module Bosh::OpenStackCloud
         network_configurator.configure(@openstack, server)
 
         @logger.info("Updating server settings for `#{server.id}'")
-        settings = initial_agent_settings(agent_id, network_spec, environment)
-        @registry.update_settings(server.id, settings)
+        settings = initial_agent_settings(server_name, agent_id, network_spec, environment)
+        @registry.update_settings(server.name, settings)
 
         server.id
       end
@@ -294,7 +290,7 @@ module Bosh::OpenStackCloud
           wait_resource(server, state, :terminated, :state)
 
           @logger.info("Deleting server settings for `#{server.id}'")
-          @registry.delete_settings(server.id)
+          @registry.delete_settings(server.name)
         end
       end
     end
@@ -448,10 +444,10 @@ module Bosh::OpenStackCloud
     # @param [Hash] network_spec Agent network spec
     # @param [Hash] environment
     # @return [Hash]
-    def initial_agent_settings(agent_id, network_spec, environment)
+    def initial_agent_settings(server_name, agent_id, network_spec, environment)
       settings = {
         "vm" => {
-          "name" => "vm-#{generate_unique_name}"
+          "name" => server_name
         },
         "agent_id" => agent_id,
         "networks" => network_spec,
@@ -473,9 +469,9 @@ module Bosh::OpenStackCloud
 
       # TODO uncomment to test registry
       @logger.info("Updating server settings for `#{server.id}'")
-      settings = @registry.read_settings(server.id)
+      settings = @registry.read_settings(server.name)
       yield settings
-      @registry.update_settings(server.id, settings)
+      @registry.update_settings(server.name, settings)
     end
 
     def generate_unique_name
@@ -565,14 +561,25 @@ module Bosh::OpenStackCloud
         client.connect_timeout = METADATA_TIMEOUT
         # Using 169.254.169.254 is an OpenStack convention for getting
         # server metadata
-        uri = "http://169.254.169.254/1.0/meta-data/instance-id/"
+        uri = "http://169.254.169.254/1.0/user-data"
 
-        response = client.get(uri)
+        headers = {"Accept" => "application/json"}
+        response = client.get(uri, {}, headers)
         unless response.status == 200
           cloud_error("Server metadata endpoint returned HTTP #{response.status}")
         end
 
-        @current_server_id = response.body.delete("i-")
+        user_data = Yajl::Parser.parse(response.body)
+        unless user_data.is_a?(Hash)
+          cloud_error("Invalid response from #{uri} , Hash expected, " \
+                      "got #{response.body.class}: #{response.body}")
+        end
+
+        unless user_data.has_key?("server") &&
+               user_data["server"].has_key?("name")
+          cloud_error("Cannot parse user data for endpoint #{user_data.inspect}")
+        end
+        @current_server_id = user_data["server"]["name"]
       end
 
     rescue HTTPClient::TimeoutError
@@ -608,15 +615,40 @@ module Bosh::OpenStackCloud
       end
     end
 
-    def copy_root_image(dir, device_name)
-      Dir.chdir(dir) do
-        dd_out = `dd if=root.img of=#{device_name} 2>&1`
-        if $?.exitstatus != 0
-          cloud_error("Unable to copy stemcell root image, " \
-                      "dd exit status #{$?.exitstatus}: " \
-                      "#{dd_out}")
-        end
+    # This method tries to execute the helper script stemcell-copy
+    # as root using sudo, since it needs to write to the volume.
+    # If stemcell-copy isn't available, it falls back to writing directly
+    # to the device, which is used in the micro bosh deployer.
+    # The stemcell-copy script must be in the PATH of the user running
+    # the director, and needs sudo privileges to execute without
+    # password.
+    def copy_root_image(image_path, device_name)
+      path = ENV["PATH"]
+
+      if stemcell_copy = has_stemcell_copy(path)
+        @logger.debug("copying stemcell using stemcell-copy script")
+        # note that is is a potentially dangerous operation, but as the
+        # stemcell-copy script sets PATH to a sane value this is safe
+        out = `sudo #{stemcell_copy} #{image_path} #{device_name} 2>&1`
+      else
+        @logger.info("falling back to using dd to copy stemcell")
+        out = `tar -xzf #{image_path} -O root.img | dd of=#{device_name} 2>&1`
       end
+
+      unless $?.exitstatus == 0
+        cloud_error("Unable to copy stemcell root image, " \
+                    "exit status #{$?.exitstatus}: #{out}")
+      end
+    end
+
+    # checks if the stemcell-copy script can be found in
+    # the current PATH
+    def has_stemcell_copy(path)
+      path.split(":").each do |dir|
+        stemcell_copy = File.join(dir, "stemcell-copy")
+        return stemcell_copy if File.exist?(stemcell_copy)
+      end
+      nil
     end
 
     ##

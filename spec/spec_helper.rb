@@ -23,6 +23,20 @@ os_config.logger.level = Logger::DEBUG
 
 Bosh::Clouds::Config.configure(os_config)
 
+def internal_to(*args, &block)
+  example = describe *args, &block
+  klass = args[0]
+  if klass.is_a? Class
+    saved_private_instance_methods = klass.private_instance_methods
+    example.before do
+      klass.class_eval { public *saved_private_instance_methods }
+    end
+    example.after do
+      klass.class_eval { private *saved_private_instance_methods }
+    end
+  end
+end
+
 def mock_cloud_options
   {
     "openstack" => {
@@ -59,6 +73,7 @@ def mock_cloud(options = nil)
   flavors = double("flavors")
   volumes = double("volumes")
   addresses = double("addresses")
+  snapshots = double("snapshots")
 
   glance = double(Fog::Image)
   Fog::Image.stub(:new).and_return(glance)
@@ -70,10 +85,27 @@ def mock_cloud(options = nil)
   openstack.stub(:flavors).and_return(flavors)
   openstack.stub(:volumes).and_return(volumes)
   openstack.stub(:addresses).and_return(addresses)
+  openstack.stub(:snapshots).and_return(snapshots)
 
   Fog::Compute.stub(:new).and_return(openstack)
 
   yield openstack if block_given?
+
+  Bosh::OpenStackCloud::Cloud.new(options || mock_cloud_options)
+end
+
+def mock_glance(options = nil)
+  images = double("images")
+
+  openstack = double(Fog::Compute)
+  Fog::Compute.stub(:new).and_return(openstack)
+
+  glance = double(Fog::Image)
+  glance.stub(:images).and_return(images)
+
+  Fog::Image.stub(:new).and_return(glance)
+
+  yield glance if block_given?
 
   Bosh::OpenStackCloud::Cloud.new(options || mock_cloud_options)
 end

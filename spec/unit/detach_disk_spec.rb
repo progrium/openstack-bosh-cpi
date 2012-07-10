@@ -9,7 +9,7 @@ describe Bosh::OpenStackCloud::Cloud do
   end
 
   it "detaches an OpenStack volume from a server" do
-    server = double("server", :id => "i-test")
+    server = double("server", :id => "i-test", :name => "i-test")
     volume = double("volume", :id => "v-foobar")
     volume_attachments = double("body", :body => {"volumeAttachments" => [{"volumeId" => "v-foobar"}, {"volumeId" => "v-barfoo"}]})
 
@@ -49,7 +49,7 @@ describe Bosh::OpenStackCloud::Cloud do
   end
 
   it "raises an error when volume is not attached to a server" do
-    server = double("server", :id => "i-test")
+    server = double("server", :id => "i-test", :name => "i-test")
     volume = double("volume", :id => "v-barfoo")
     volume_attachments = double("body", :body => {"volumeAttachments" => [{"volumeId" => "v-foobar"}]})
 
