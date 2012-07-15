@@ -219,20 +219,20 @@ module Bosh::OpenStackCloud
         security_groups = network_configurator.security_groups(@default_security_groups)
         @logger.debug("using security groups: #{security_groups.join(', ')}")
 
-        image_id = @openstack.images.find { |i| i.name == stemcell_id }
-        if image_id.nil?
+        image = @openstack.images.find { |i| i.id == stemcell_id }
+        if image.nil?
           cloud_error("OpenStack CPI: image #{stemcell_id} not found")
         end
 
-        flavor_id = @openstack.flavors.find { |f| f.name == resource_pool["instance_type"] }
-        if flavor_id.nil?
+        flavor = @openstack.flavors.find { |f| f.name == resource_pool["instance_type"] }
+        if flavor.nil?
           cloud_error("OpenStack CPI: flavor #{resource_pool["instance_type"]} not found")
         end
 
         server_params = {
           :name => server_name,
-          :image_ref => image_id.id,
-          :flavor_ref => flavor_id.id,
+          :image_ref => image.id,
+          :flavor_ref => flavor.id,
           :key_name => resource_pool["key_name"] || @default_key_name,
           :security_groups => security_groups.map { |secgrp| {:name => secgrp} },
           :user_data => Yajl::Encoder.encode(metadata)
