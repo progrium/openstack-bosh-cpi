@@ -57,8 +57,8 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
 
     cloud = mock_cloud do |openstack|
       openstack.servers.should_receive(:create).with(openstack_params(unique_name, user_data)).and_return(server)
-      openstack.images.should_receive(:each).and_yield(image)
-      openstack.flavors.should_receive(:each).and_yield(flavor)
+      openstack.images.should_receive(:find).and_return(image)
+      openstack.flavors.should_receive(:find).and_return(flavor)
       openstack.addresses.should_receive(:each).and_yield(address)
     end
 
@@ -96,8 +96,8 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
 
     cloud = mock_cloud do |openstack|
       openstack.servers.should_receive(:create).with(openstack_params(unique_name, user_data, security_groups)).and_return(server)
-      openstack.images.should_receive(:each).and_yield(image)
-      openstack.flavors.should_receive(:each).and_yield(flavor)
+      openstack.images.should_receive(:find).and_return(image)
+      openstack.flavors.should_receive(:find).and_return(flavor)
       openstack.addresses.should_receive(:each).and_yield(address)
     end
 
@@ -122,8 +122,8 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
 
     cloud = mock_cloud do |openstack|
       openstack.servers.should_receive(:create).and_return(server)
-      openstack.images.should_receive(:each).and_yield(image)
-      openstack.flavors.should_receive(:each).and_yield(flavor)
+      openstack.images.should_receive(:find).and_return(image)
+      openstack.flavors.should_receive(:find).and_return(flavor)
       openstack.addresses.should_receive(:each).and_yield(address)
     end
 
