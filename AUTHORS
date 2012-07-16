@@ -1,0 +1,14 @@
+#  Authors
+# =========
+#
+# This is a reasonably complete list of everyone who has committed
+# code to the OpenStack BOSH CPI project. The list is just ordered by first
+# name here, but the file is (and should be kept) YAML-formatted.
+#
+# Please feel free to add any personal details.
+
+---
+- Ferran Rodenas        { email: frodenas@gmail.com }
+- Igor Bolotin          { company: "X.commerce" }
+- Josh Kearney          { email: josh@jk0.org, company: "Piston Cloud Computing" }
+- Joshua McKenty        { email: joshua@pistoncloud.com, company: "Piston Cloud Computing" }
