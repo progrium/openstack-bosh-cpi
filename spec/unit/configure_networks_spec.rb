@@ -17,7 +17,7 @@ describe Bosh::OpenStackCloud::Cloud do
       openstack.addresses.should_receive(:each).and_yield(address)
     end
 
-    address.should_receive(:associate).with(server)
+    address.should_receive(:server=).with(server)
 
     old_settings = { "foo" => "bar", "networks" => "baz" }
     new_settings = { "foo" => "bar", "networks" => combined_network_spec }
@@ -37,7 +37,7 @@ describe Bosh::OpenStackCloud::Cloud do
       openstack.addresses.should_receive(:each).and_yield(address)
     end
 
-    address.should_receive(:disassociate)
+    address.should_receive(:server=).with(nil)
 
     old_settings = { "foo" => "bar", "networks" => combined_network_spec }
     new_settings = { "foo" => "bar", "networks" => { "net_a" => dynamic_network_spec } }

@@ -30,7 +30,6 @@ module Bosh::OpenStackCloud
 
       @default_key_name = @openstack_properties["default_key_name"]
       @default_security_groups = @openstack_properties["default_security_groups"]
-      @create_stemcell_image = @openstack_properties["create_stemcell_image"] || "volume"
 
       openstack_params = {
         :provider => "OpenStack",
@@ -57,22 +56,6 @@ module Bosh::OpenStackCloud
     # @param [String] image_path local filesystem path to a stemcell image
     # @param [Hash] cloud_properties CPI-specific properties
     def create_stemcell(image_path, cloud_properties)
-      if @create_stemcell_image == "upload"
-        create_stemcell_using_upload(image_path, cloud_properties)
-      else
-        create_stemcell_using_volume(image_path, cloud_properties)
-      end
-    end
-
-
-    ##
-    # Creates a new OpenStack Image using stemcell image.
-    # This method uses direct image upload.
-    # Current implementation of image service loads entire image into memory for upload,
-    # so if this methos is used - make sure that the server has plenty of available memory
-    # @param [String] image_path local filesystem path to a stemcell image
-    # @param [Hash] cloud_properties CPI-specific properties
-    def create_stemcell_using_upload(image_path, cloud_properties)
       # TODO: refactor into several smaller methods
       with_thread_name("create_stemcell(#{image_path}...)") do
         begin
@@ -86,15 +69,19 @@ module Bosh::OpenStackCloud
             # 2. Upload image using Glance service
             image_params = {
                 :name => "BOSH-#{generate_unique_name}",
-                :disk_format => "ami",
-                :container_format => "ami",
-                :properties => {
-                  :kernel_id => cloud_properties["kernel_id"],
-                  :ramdisk_id => cloud_properties["ramdisk_id"],
-                },
+                :disk_format => cloud_properties["disk_format"],
+                :container_format => cloud_properties["container_format"],
                 :location => root_image,
                 :is_public => true
             }
+
+            if cloud_properties["properties"]
+              src = cloud_properties["properties"]
+              properties = {}
+              properties[:kernel_id] = src["kernel_id"] if src["kernel_id"]
+              properties[:ramdisk_id] = src["ramdisk_id"] if src["ramdisk_id"]
+              image_params[:properties] = properties unless properties.empty?
+            end
 
             @logger.info("Creating new image...")
             image = @glance.images.create(image_params)
@@ -103,73 +90,11 @@ module Bosh::OpenStackCloud
             @logger.info("Creating new image `#{image.id}', state is `#{state}'")
             wait_resource(image, state, :active)
 
-            image.id
+            image.id.to_s
           end
         rescue => e
           @logger.error(e)
           raise e
-        end
-      end
-    end
-
-    ##
-    # Creates a new OpenStack Image using stemcell image.
-    # This method can only be run on an OpenStack server, as image creation
-    # involves creating and mounting a new OpenStack volume as local block device.
-    # @param [String] image_path local filesystem path to a stemcell image
-    # @param [Hash] cloud_properties CPI-specific properties
-    def create_stemcell_using_volume(image_path, cloud_properties)
-      # TODO: refactor into several smaller methods
-      with_thread_name("create_stemcell(#{image_path}...)") do
-        begin
-          # These two variables are used in 'ensure' clause
-          server = nil
-          volume = nil
-
-          # 1. Create and mount new OpenStack volume (2GB default)
-          disk_size = cloud_properties["disk"] || 2048
-          servers = @openstack.servers.all(:name => current_server_id)
-          if servers.empty?
-            cloud_error("OpenStack CPI: server #{current_server_id} not found")
-          else
-            server = servers.first
-          end
-          volume_id = create_disk(disk_size, server.id)
-          volume = @openstack.volumes.get(volume_id)
-
-          vd_name = attach_volume(server, volume)
-          device_name = find_device(vd_name)
-
-          # 2. Copy image to new OpenStack volume
-          @logger.info("Copying stemcell disk image to '#{device_name}'")
-          copy_root_image(image_path, device_name)
-
-          # 3. Create a volume snapshot and then an image using this snapshot
-          snapshot_params = {
-            :name => "BOSH-#{generate_unique_name}",
-            :description => "",
-            :volume_id => volume_id
-          }
-
-          @logger.info("Creating new snapshot...")
-          snapshot = @openstack.snapshots.create(snapshot_params)
-          state = snapshot.status
-
-          @logger.info("Creating new snapshot `#{snapshot.id}', state is `#{state}'")
-          wait_resource(snapshot, state, :available)
-
-          # TODO Creating an image from a volume snapshot is not available in OpenStack,
-          # TODO But we can boot a server from volume snapshot!!!
-          cloud_error("Creating a stemcell from a volume is not supported by OpenStack CPI")
-        rescue => e
-          # TODO: delete snapshot?
-          @logger.error(e)
-          raise e
-        ensure
-          if server && volume
-            detach_volume(server, volume)
-            delete_disk(volume.id)
-          end
         end
       end
     end
@@ -257,7 +182,7 @@ module Bosh::OpenStackCloud
         settings = initial_agent_settings(server_name, agent_id, network_spec, environment)
         @registry.update_settings(server.name, settings)
 
-        server.id
+        server.id.to_s
       end
     end
 
@@ -350,7 +275,7 @@ module Bosh::OpenStackCloud
         @logger.info("Creating new volume `#{volume.id}', state is `#{state}'")
         wait_resource(volume, state, :available)
 
-        volume.id
+        volume.id.to_s
       end
     end
 

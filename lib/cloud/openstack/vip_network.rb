@@ -34,8 +34,8 @@ module Bosh::OpenStackCloud
       addresses = openstack.addresses
       addresses.each do |address|
         if address.ip == @ip
-          address.disassociate unless address.instance_id.nil?
-          address.associate(server)
+          address.server = nil unless address.instance_id.nil?
+          address.server = server
           address_id = address.id
           break
         end

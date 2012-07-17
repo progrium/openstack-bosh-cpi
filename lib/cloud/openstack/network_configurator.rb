@@ -71,7 +71,7 @@ module Bosh::OpenStackCloud
           if address.instance_id == server.id
             @logger.info("Disassociating floating IP `#{address.ip}' " \
                          "from server `#{server.id}'")
-            address.disassociate
+            address.server = nil
           end
         end
       end
