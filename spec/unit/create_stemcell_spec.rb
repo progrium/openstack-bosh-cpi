@@ -17,12 +17,12 @@ describe Bosh::OpenStackCloud::Cloud do
         :name => "BOSH-#{unique_name}",
         :disk_format => "ami",
         :container_format => "ami",
-        :properties => {
-          "kernel_id" => "k-id",
-          "ramdisk_id" => "r-id",
-        },
         :location => "#{@tmp_dir}/root.img",
-        :is_public => true
+        :is_public => true,
+        :properties => {
+          :kernel_id => "k-id",
+          :ramdisk_id => "r-id",
+        }
       }
 
       cloud = mock_glance do |glance|
