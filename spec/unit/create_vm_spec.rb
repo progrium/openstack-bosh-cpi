@@ -63,7 +63,7 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
     end
 
     cloud.should_receive(:generate_unique_name).and_return(unique_name)
-    address.should_receive(:disassociate)
+    address.should_receive(:server=).with(nil)
     server.should_receive(:state).and_return(:build)
     cloud.should_receive(:wait_resource).with(server, :build, :active, :state)
 
@@ -127,8 +127,8 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
       openstack.addresses.should_receive(:each).and_yield(address)
     end
 
-    address.should_receive(:disassociate)
-    address.should_receive(:associate).with(server)
+    address.should_receive(:server=).with(nil)
+    address.should_receive(:server=).with(server)
     server.should_receive(:state).and_return(:build)
     cloud.should_receive(:wait_resource).with(server, :build, :active, :state)
 
