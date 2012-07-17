@@ -90,7 +90,7 @@ module Bosh::OpenStackCloud
             @logger.info("Creating new image `#{image.id}', state is `#{state}'")
             wait_resource(image, state, :active)
 
-            image.id
+            image.id.to_s
           end
         rescue => e
           @logger.error(e)
@@ -182,7 +182,7 @@ module Bosh::OpenStackCloud
         settings = initial_agent_settings(server_name, agent_id, network_spec, environment)
         @registry.update_settings(server.name, settings)
 
-        server.id
+        server.id.to_s
       end
     end
 
@@ -275,7 +275,7 @@ module Bosh::OpenStackCloud
         @logger.info("Creating new volume `#{volume.id}', state is `#{state}'")
         wait_resource(volume, state, :available)
 
-        volume.id
+        volume.id.to_s
       end
     end
 
