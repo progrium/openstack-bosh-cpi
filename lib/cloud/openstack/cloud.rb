@@ -68,20 +68,16 @@ module Bosh::OpenStackCloud
 
             # 2. Upload image using Glance service
             image_params = {
-                :name => "BOSH-#{generate_unique_name}",
-                :disk_format => cloud_properties["disk_format"],
-                :container_format => cloud_properties["container_format"],
-                :location => root_image,
-                :is_public => true
+              :name => "BOSH-#{generate_unique_name}",
+              :disk_format => cloud_properties["disk_format"],
+              :container_format => cloud_properties["container_format"],
+              :properties => {
+                :kernel_id => cloud_properties["kernel_id"],
+                :ramdisk_id => cloud_properties["ramdisk_id"],
+              },
+              :location => root_image,
+              :is_public => true
             }
-
-            if cloud_properties["properties"]
-              src = cloud_properties["properties"]
-              properties = {}
-              properties[:kernel_id] = src["kernel_id"] if src["kernel_id"]
-              properties[:ramdisk_id] = src["ramdisk_id"] if src["ramdisk_id"]
-              image_params[:properties] = properties unless properties.empty?
-            end
 
             @logger.info("Creating new image...")
             image = @glance.images.create(image_params)
