@@ -17,12 +17,12 @@ describe Bosh::OpenStackCloud::Cloud do
         :name => "BOSH-#{unique_name}",
         :disk_format => "ami",
         :container_format => "ami",
-        :properties => {
-          "kernel_id" => "k-id",
-          "ramdisk_id" => "r-id",
-        },
         :location => "#{@tmp_dir}/root.img",
-        :is_public => true
+        :is_public => true,
+        :properties => {
+          :kernel_id => "k-id",
+          :ramdisk_id => "r-id",
+        }
       }
 
       cloud = mock_glance do |glance|
@@ -36,13 +36,11 @@ describe Bosh::OpenStackCloud::Cloud do
       cloud.should_receive(:wait_resource).with(image, :queued, :active)
 
       sc_id = cloud.create_stemcell("/tmp/foo", {
-          "container_format" => "ami",
-          "disk_format" => "ami",
-          "properties" => {
-            "kernel_id" => "k-id",
-            "ramdisk_id" => "r-id"
-          }
-        })
+        "container_format" => "ami",
+        "disk_format" => "ami",
+        "kernel_id" => "k-id",
+        "ramdisk_id" => "r-id"
+      })
 
       sc_id.should == "i-bar"
     end

@@ -68,20 +68,16 @@ module Bosh::OpenStackCloud
 
             # 2. Upload image using Glance service
             image_params = {
-                :name => "BOSH-#{generate_unique_name}",
-                :disk_format => cloud_properties["disk_format"],
-                :container_format => cloud_properties["container_format"],
-                :location => root_image,
-                :is_public => true
+              :name => "BOSH-#{generate_unique_name}",
+              :disk_format => cloud_properties["disk_format"],
+              :container_format => cloud_properties["container_format"],
+              :properties => {
+                :kernel_id => cloud_properties["kernel_id"],
+                :ramdisk_id => cloud_properties["ramdisk_id"],
+              },
+              :location => root_image,
+              :is_public => true
             }
-
-            if cloud_properties["properties"]
-              src = cloud_properties["properties"]
-              properties = {}
-              properties[:kernel_id] = src["kernel_id"] if src["kernel_id"]
-              properties[:ramdisk_id] = src["ramdisk_id"] if src["ramdisk_id"]
-              image_params[:properties] = properties unless properties.empty?
-            end
 
             @logger.info("Creating new image...")
             image = @glance.images.create(image_params)
@@ -524,42 +520,6 @@ module Bosh::OpenStackCloud
       unless File.exists?(root_image)
         cloud_error("Root image is missing from stemcell archive")
       end
-    end
-
-    # This method tries to execute the helper script stemcell-copy
-    # as root using sudo, since it needs to write to the volume.
-    # If stemcell-copy isn't available, it falls back to writing directly
-    # to the device, which is used in the micro bosh deployer.
-    # The stemcell-copy script must be in the PATH of the user running
-    # the director, and needs sudo privileges to execute without
-    # password.
-    def copy_root_image(image_path, device_name)
-      path = ENV["PATH"]
-
-      if stemcell_copy = has_stemcell_copy(path)
-        @logger.debug("copying stemcell using stemcell-copy script")
-        # note that is is a potentially dangerous operation, but as the
-        # stemcell-copy script sets PATH to a sane value this is safe
-        out = `sudo #{stemcell_copy} #{image_path} #{device_name} 2>&1`
-      else
-        @logger.info("falling back to using dd to copy stemcell")
-        out = `tar -xzf #{image_path} -O root.img | dd of=#{device_name} 2>&1`
-      end
-
-      unless $?.exitstatus == 0
-        cloud_error("Unable to copy stemcell root image, " \
-                    "exit status #{$?.exitstatus}: #{out}")
-      end
-    end
-
-    # checks if the stemcell-copy script can be found in
-    # the current PATH
-    def has_stemcell_copy(path)
-      path.split(":").each do |dir|
-        stemcell_copy = File.join(dir, "stemcell-copy")
-        return stemcell_copy if File.exist?(stemcell_copy)
-      end
-      nil
     end
 
     ##
