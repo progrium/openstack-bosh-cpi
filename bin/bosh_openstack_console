@@ -49,6 +49,10 @@ module ConsoleHelpers
     cpi.openstack
   end
 
+  def glance
+    cpi.glance
+  end
+
   def registry
     cpi.registry
   end
@@ -70,5 +74,6 @@ end
 puts "=> Welcome to BOSH OpenStack CPI console"
 puts "You can use 'cpi' to access CPI methods"
 puts "You can use 'openstack' to access Fog::Compute::OpenStack methods"
+puts "You can use 'glance' to access Fog::Image::OpenStack methods"
 
 IRB.start
