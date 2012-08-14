@@ -56,7 +56,6 @@ module Bosh::OpenStackCloud
     # @param [String] image_path local filesystem path to a stemcell image
     # @param [Hash] cloud_properties CPI-specific properties
     def create_stemcell(image_path, cloud_properties)
-      # TODO: refactor into several smaller methods
       with_thread_name("create_stemcell(#{image_path}...)") do
         begin
           Dir.mktmpdir do |tmp_dir|
@@ -78,15 +77,7 @@ module Bosh::OpenStackCloud
               :location => root_image,
               :is_public => true
             }
-
-            @logger.info("Creating new image...")
-            image = @glance.images.create(image_params)
-            state = image.status
-
-            @logger.info("Creating new image `#{image.id}', state is `#{state}'")
-            wait_resource(image, state, :active)
-
-            image.id.to_s
+            upload_image(image_params)
           end
         rescue => e
           @logger.error(e)
@@ -454,6 +445,20 @@ module Bosh::OpenStackCloud
       @logger.info("Detaching volume `#{volume.id}' from `#{server.id}', state is `#{state}'")
       volume.detach(server.id, volume.id)
       wait_resource(volume, state, :available)
+    end
+
+    ##
+    # Uploads a new image to OpenStack via Glance
+    # @param [Hash] image_params Image params
+    def upload_image(image_params)
+      @logger.info("Creating new image...")
+      image = @glance.images.create(image_params)
+      state = image.status
+
+      @logger.info("Creating new image `#{image.id}', state is `#{state}'")
+      wait_resource(image, state, :active)
+
+      image.id.to_s
     end
 
     ##
