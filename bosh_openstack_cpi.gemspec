@@ -19,8 +19,8 @@ Gem::Specification.new do |s|
   s.executables  = %w(bosh_openstack_console)
 
   s.add_dependency "fog", ">=1.5.0"
-  s.add_dependency "bosh_common", ">=0.4.0"
-  s.add_dependency "bosh_cpi", ">=0.4.3"
+  s.add_dependency "bosh_common", ">=0.5.0"
+  s.add_dependency "bosh_cpi", ">=0.4.4"
   s.add_dependency "httpclient", ">=2.2.0"
   s.add_dependency "uuidtools", ">=2.1.2"
   s.add_dependency "yajl-ruby", ">=0.8.2"

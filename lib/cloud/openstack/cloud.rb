@@ -56,37 +56,72 @@ module Bosh::OpenStackCloud
     # @param [String] image_path local filesystem path to a stemcell image
     # @param [Hash] cloud_properties CPI-specific properties
     def create_stemcell(image_path, cloud_properties)
-      # TODO: refactor into several smaller methods
       with_thread_name("create_stemcell(#{image_path}...)") do
         begin
           Dir.mktmpdir do |tmp_dir|
             @logger.info("Extracting stemcell to `#{tmp_dir}'")
+            image_name = "BOSH-#{generate_unique_name}"
 
             # 1. Unpack image to temp directory
             unpack_image(tmp_dir, image_path)
             root_image = File.join(tmp_dir, "root.img")
 
-            # 2. Upload image using Glance service
+            # 2. If image contains a kernel file, upload it
+            kernel_id = nil
+            if cloud_properties["kernel_id"]
+              kernel_id = cloud_properties["kernel_id"]
+            elsif cloud_properties["kernel_file"]
+              kernel_image = File.join(tmp_dir, cloud_properties["kernel_file"])
+              unless File.exists?(kernel_image)
+                cloud_error("Kernel image is missing from stemcell archive")
+              end
+              kernel_params = {
+                :name => "AKI-#{image_name}",
+                :disk_format => "aki",
+                :container_format => "aki",
+                :location => kernel_image,
+                :properties => {
+                  :stemcell => image_name
+                }
+              }
+              kernel_id = upload_image(kernel_params)
+            end
+
+            # 3. If image contains a ramdisk file, upload it
+            ramdisk_id = nil
+            if cloud_properties["ramdisk_id"]
+              ramdisk_id = cloud_properties["ramdisk_id"]
+            elsif cloud_properties["ramdisk_file"]
+              ramdisk_image = File.join(tmp_dir, cloud_properties["ramdisk_file"])
+              unless File.exists?(kernel_image)
+                cloud_error("Ramdisk image is missing from stemcell archive")
+              end
+              ramdisk_params = {
+                :name => "ARI-#{image_name}",
+                :disk_format => "ari",
+                :container_format => "ari",
+                :location => ramdisk_image,
+                :properties => {
+                  :stemcell => image_name
+                }
+              }
+              ramdisk_id = upload_image(ramdisk_params)
+            end
+
+            # 4. Upload image using Glance service
             image_params = {
-              :name => "BOSH-#{generate_unique_name}",
+              :name => image_name,
               :disk_format => cloud_properties["disk_format"],
               :container_format => cloud_properties["container_format"],
-              :properties => {
-                :kernel_id => cloud_properties["kernel_id"],
-                :ramdisk_id => cloud_properties["ramdisk_id"],
-              },
               :location => root_image,
               :is_public => true
             }
+            image_properties = {}
+            image_properties[:kernel_id] = kernel_id if kernel_id
+            image_properties[:ramdisk_id] = ramdisk_id if ramdisk_id
+            image_params[:properties] = image_properties unless image_properties.empty?
 
-            @logger.info("Creating new image...")
-            image = @glance.images.create(image_params)
-            state = image.status
-
-            @logger.info("Creating new image `#{image.id}', state is `#{state}'")
-            wait_resource(image, state, :active)
-
-            image.id.to_s
+            upload_image(image_params)
           end
         rescue => e
           @logger.error(e)
@@ -101,7 +136,30 @@ module Bosh::OpenStackCloud
     def delete_stemcell(stemcell_id)
       with_thread_name("delete_stemcell(#{stemcell_id})") do
         @logger.info("Deleting `#{stemcell_id}' stemcell")
-        image = @openstack.images.get(stemcell_id)
+        image = @glance.images.find_by_id(stemcell_id)
+
+        kernel_id = image.properties["kernel_id"]
+        if kernel_id
+          kernel = @glance.images.find_by_id(kernel_id)
+          if kernel.properties["stemcell"]
+            if kernel.properties["stemcell"] == image.name
+              @logger.info("Deleting `#{stemcell_id}' stemcell kernel")
+              kernel.destroy
+            end
+          end
+        end
+
+        ramdisk_id = image.properties["ramdisk_id"]
+        if ramdisk_id
+          ramdisk = @glance.images.find_by_id(ramdisk_id)
+          if ramdisk.properties["stemcell"]
+            if ramdisk.properties["stemcell"] == image.name
+              @logger.info("Deleting `#{stemcell_id}' stemcell ramdisk")
+              ramdisk.destroy
+            end
+          end
+        end
+
         image.destroy
       end
     end
@@ -454,6 +512,20 @@ module Bosh::OpenStackCloud
       @logger.info("Detaching volume `#{volume.id}' from `#{server.id}', state is `#{state}'")
       volume.detach(server.id, volume.id)
       wait_resource(volume, state, :available)
+    end
+
+    ##
+    # Uploads a new image to OpenStack via Glance
+    # @param [Hash] image_params Image params
+    def upload_image(image_params)
+      @logger.info("Creating new image...")
+      image = @glance.images.create(image_params)
+      state = image.status
+
+      @logger.info("Creating new image `#{image.id}', state is `#{state}'")
+      wait_resource(image, state, :active)
+
+      image.id.to_s
     end
 
     ##
