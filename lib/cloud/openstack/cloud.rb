@@ -65,18 +65,55 @@ module Bosh::OpenStackCloud
             unpack_image(tmp_dir, image_path)
             root_image = File.join(tmp_dir, "root.img")
 
-            # 2. Upload image using Glance service
+            # 2. If image contains a kernel file, upload it
+            kernel_id = nil
+            if cloud_properties["kernel_id"]
+              kernel_id = cloud_properties["kernel_id"]
+            elsif cloud_properties["kernel_file"]
+              kernel_image = File.join(tmp_dir, cloud_properties["kernel_file"])
+              unless File.exists?(kernel_image)
+                cloud_error("Kernel image is missing from stemcell archive")
+              end
+              kernel_params = {
+                :name => "BOSH-AKI-#{generate_unique_name}",
+                :disk_format => "aki",
+                :container_format => "aki",
+                :location => kernel_image
+              }
+              kernel_id = upload_image(kernel_params)
+            end
+
+            # 3. If image contains a ramdisk file, upload it
+            ramdisk_id = nil
+            if cloud_properties["ramdisk_id"]
+              ramdisk_id = cloud_properties["ramdisk_id"]
+            elsif cloud_properties["ramdisk_file"]
+              ramdisk_image = File.join(tmp_dir, cloud_properties["ramdisk_file"])
+              unless File.exists?(kernel_image)
+                cloud_error("Ramdisk image is missing from stemcell archive")
+              end
+              ramdisk_params = {
+                :name => "BOSH-ARI-#{generate_unique_name}",
+                :disk_format => "ari",
+                :container_format => "ari",
+                :location => ramdisk_image
+              }
+              ramdisk_id = upload_image(ramdisk_params)
+            end
+
+            # 4. Upload image using Glance service
             image_params = {
               :name => "BOSH-#{generate_unique_name}",
               :disk_format => cloud_properties["disk_format"],
               :container_format => cloud_properties["container_format"],
-              :properties => {
-                :kernel_id => cloud_properties["kernel_id"],
-                :ramdisk_id => cloud_properties["ramdisk_id"],
-              },
               :location => root_image,
               :is_public => true
             }
+            image_properties = {}
+            image_properties[:kernel_id] = kernel_id if kernel_id
+            image_properties[:ramdisk_id] = ramdisk_id if ramdisk_id
+            image_params[:properties] = image_properties unless image_properties.empty?
+
             upload_image(image_params)
           end
         rescue => e
