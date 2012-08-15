@@ -1,0 +1,18 @@
+=== 0.034 - 2012-08-15
+* Add Authors file
+* Fix image look-up
+* Fix Floating IP association
+* Refactor create_stemcell
+* Return all Cloud IDs as Strings
+* Added @vamins to AUTHORS
+* Update bundled fog gem
+* Fix create_stemcell unit spec (string<->symbol)
+* Delete unused copy_root_image method and has_stemcell_copy tests
+* Fix create_stemcell
+* Upgrade fog gem to version 1.5.0
+* Remove files from git (.gitignore)
+* Add glance to BOSH OpenStack CPI console
+* Added a new method to upload images
+* Add support to kernel_file and ramdisk_file stemcell options
+* Delete kernel and ramdisk when deleting the stemcell
+* Upgrade some gems: bosh_common, bosh_cpi, excon, httpclient, uuidtools
