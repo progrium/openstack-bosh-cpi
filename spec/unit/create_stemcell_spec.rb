@@ -82,16 +82,22 @@ describe Bosh::OpenStackCloud::Cloud do
       ramdisk = double("image", :id => "r-img-id", :name => "r-img-id")
       unique_name = UUIDTools::UUID.random_create.to_s
       kernel_params = {
-        :name => "BOSH-AKI-#{unique_name}",
+        :name => "AKI-BOSH-#{unique_name}",
         :disk_format => "aki",
         :container_format => "aki",
         :location => "#{@tmp_dir}/kernel.img",
+        :properties => {
+          :stemcell => "BOSH-#{unique_name}",
+        }
       }
       ramdisk_params = {
-        :name => "BOSH-ARI-#{unique_name}",
+        :name => "ARI-BOSH-#{unique_name}",
         :disk_format => "ari",
         :container_format => "ari",
         :location => "#{@tmp_dir}/initrd.img",
+        :properties => {
+          :stemcell => "BOSH-#{unique_name}",
+        }
       }
       image_params = {
         :name => "BOSH-#{unique_name}",
@@ -114,8 +120,7 @@ describe Bosh::OpenStackCloud::Cloud do
       Dir.should_receive(:mktmpdir).and_yield(@tmp_dir)
       cloud.should_receive(:unpack_image).with(@tmp_dir, "/tmp/foo")
       File.stub(:exists?).and_return(true)
-      cloud.should_receive(:generate_unique_name).exactly(3).times.
-          and_return(unique_name, unique_name, unique_name)
+      cloud.should_receive(:generate_unique_name).and_return(unique_name)
       kernel.should_receive(:status).and_return(:queued)
       cloud.should_receive(:wait_resource).with(kernel, :queued, :active)
       ramdisk.should_receive(:status).and_return(:queued)
