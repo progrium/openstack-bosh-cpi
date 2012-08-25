@@ -14,9 +14,6 @@ begin
 rescue LoadError
 end
 
-require "../bosh/rake/bundler_task"
-require "../bosh/rake/ci_task"
-
 gem_helper = Bundler::GemHelper.new(Dir.pwd)
 
 desc "Build CPI gem into the pkg directory"
@@ -30,8 +27,6 @@ task "install" do
   gem_helper.install_gem
 end
 
-BundlerTask.new
-
 if defined?(RSpec)
   namespace :spec do
     desc "Run Unit Tests"
@@ -39,12 +34,9 @@ if defined?(RSpec)
       t.pattern = "spec/unit/**/*_spec.rb"
       t.rspec_opts = %w(--format progress --colour)
     end
-
-    CiTask.new do |task|
-      task.rspec_task = rspec_task
-    end
   end
 
   desc "Run tests"
   task :spec => %w(spec:unit)
+  task :default => :spec
 end
