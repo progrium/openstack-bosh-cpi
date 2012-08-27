@@ -1,5 +1,7 @@
 # OpenStack BOSH Cloud Provider Interface
 
+[![Build Status](https://secure.travis-ci.org/piston/openstack-bosh-cpi.png)](http://travis-ci.org/piston/openstack-bosh-cpi)
+
 ## Bringing the world’s most popular open source platform-as-a-service to the world’s most popular open source infrastructure-as-a-service platform
 
 This repo contains software designed to manage the deployment of Cloud Foundry on top of OpenStack, using Cloud Foundry BOSH. Say what?
