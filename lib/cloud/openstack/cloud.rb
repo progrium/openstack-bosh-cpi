@@ -540,7 +540,7 @@ module Bosh::OpenStackCloud
         client.connect_timeout = METADATA_TIMEOUT
         # Using 169.254.169.254 is an OpenStack convention for getting
         # server metadata
-        uri = "http://169.254.169.254/1.0/user-data"
+        uri = "http://169.254.169.254/latest/user-data"
 
         headers = {"Accept" => "application/json"}
         response = client.get(uri, {}, headers)
