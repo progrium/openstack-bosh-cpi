@@ -213,7 +213,7 @@ module Bosh::OpenStackCloud
           :image_ref => image.id,
           :flavor_ref => flavor.id,
           :key_name => resource_pool["key_name"] || @default_key_name,
-          :security_groups => security_groups.map,
+          :security_groups => security_groups,
           :user_data => Yajl::Encoder.encode(metadata)
         }
 
