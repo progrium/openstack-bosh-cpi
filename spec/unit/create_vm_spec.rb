@@ -30,7 +30,7 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
       :image_ref => "sc-id",
       :flavor_ref => "f-test",
       :key_name => "test_key",
-      :security_groups => security_groups.map { |secgrp| {:name => secgrp} },
+      :security_groups => security_groups,
       :user_data => Yajl::Encoder.encode(user_data),
       :availability_zone => "foobar-1a"
     }
