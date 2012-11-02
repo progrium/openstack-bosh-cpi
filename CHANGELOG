@@ -1,4 +1,11 @@
-=== 0.034 - 2012-08-15
+=== 0.04 - 2012-11-01
+* Use "latest" metadata endpoint
+* security groups are already put into hashes at this point, so without…
+* empty map returns an enumerator, but it should just be the array
+* Upgrade bosh_common and fog gems
+* Fix create_vm with security groups unit test
+
+=== 0.03 - 2012-08-15
 * Add Authors file
 * Fix image look-up
 * Fix Floating IP association
