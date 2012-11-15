@@ -60,12 +60,7 @@ module Bosh::OpenStackCloud
         begin
           Dir.mktmpdir do |tmp_dir|
             @logger.info("Extracting stemcell to `#{tmp_dir}'")
-            if cloud_properties["name"] && cloud_properties["version"]
-              image_name = cloud_properties["name"] + "-" +
-                           cloud_properties["version"]
-            else
-              image_name = "BOSH-#{generate_unique_name}"
-            end
+            image_name = "BOSH-#{generate_unique_name}"
 
             # 1. Unpack image to temp directory
             unpack_image(tmp_dir, image_path)
@@ -124,6 +119,12 @@ module Bosh::OpenStackCloud
             image_properties = {}
             image_properties[:kernel_id] = kernel_id if kernel_id
             image_properties[:ramdisk_id] = ramdisk_id if ramdisk_id
+            if cloud_properties["name"]
+              image_properties[:stemcell_name] = cloud_properties["name"]
+            end
+            if cloud_properties["version"]
+              image_properties[:stemcell_version] = cloud_properties["version"]
+            end
             image_params[:properties] = image_properties unless image_properties.empty?
 
             upload_image(image_params)

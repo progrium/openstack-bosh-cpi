@@ -142,26 +142,27 @@ describe Bosh::OpenStackCloud::Cloud do
       image = double("image", :id => "i-bar", :name => "i-bar")
       kernel = double("image", :id => "k-img-id", :name => "k-img-id")
       ramdisk = double("image", :id => "r-img-id", :name => "r-img-id")
+      unique_name = UUIDTools::UUID.random_create.to_s
       kernel_params = {
-        :name => "bosh-stemcell-x.y.z-AKI",
+        :name => "BOSH-#{unique_name}-AKI",
         :disk_format => "aki",
         :container_format => "aki",
         :location => "#{@tmp_dir}/kernel.img",
         :properties => {
-          :stemcell => "bosh-stemcell-x.y.z",
+          :stemcell => "BOSH-#{unique_name}",
         }
       }
       ramdisk_params = {
-        :name => "bosh-stemcell-x.y.z-ARI",
+        :name => "BOSH-#{unique_name}-ARI",
         :disk_format => "ari",
         :container_format => "ari",
         :location => "#{@tmp_dir}/initrd.img",
         :properties => {
-          :stemcell => "bosh-stemcell-x.y.z",
+          :stemcell => "BOSH-#{unique_name}",
         }
       }
       image_params = {
-        :name => "bosh-stemcell-x.y.z",
+        :name => "BOSH-#{unique_name}",
         :disk_format => "ami",
         :container_format => "ami",
         :location => "#{@tmp_dir}/root.img",
@@ -169,6 +170,8 @@ describe Bosh::OpenStackCloud::Cloud do
         :properties => {
           :kernel_id => "k-img-id",
           :ramdisk_id => "r-img-id",
+          :stemcell_name => "bosh-stemcell",
+          :stemcell_version => "x.y.z"
         }
       }
 
@@ -181,6 +184,7 @@ describe Bosh::OpenStackCloud::Cloud do
       Dir.should_receive(:mktmpdir).and_yield(@tmp_dir)
       cloud.should_receive(:unpack_image).with(@tmp_dir, "/tmp/foo")
       File.stub(:exists?).and_return(true)
+      cloud.should_receive(:generate_unique_name).and_return(unique_name)
       kernel.should_receive(:status).and_return(:queued)
       cloud.should_receive(:wait_resource).with(kernel, :queued, :active)
       ramdisk.should_receive(:status).and_return(:queued)
