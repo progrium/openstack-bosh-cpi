@@ -59,7 +59,7 @@ module Bosh::OpenStackCloud
       with_thread_name("create_stemcell(#{image_path}...)") do
         begin
           Dir.mktmpdir do |tmp_dir|
-            @logger.info("Extracting stemcell to `#{tmp_dir}'")
+            @logger.info("Extracting stemcell to `#{tmp_dir}'...")
             image_name = "BOSH-#{generate_unique_name}"
 
             # 1. Unpack image to temp directory
@@ -141,7 +141,7 @@ module Bosh::OpenStackCloud
     # @param [String] stemcell stemcell id that was once returned by {#create_stemcell}
     def delete_stemcell(stemcell_id)
       with_thread_name("delete_stemcell(#{stemcell_id})") do
-        @logger.info("Deleting `#{stemcell_id}' stemcell")
+        @logger.info("Deleting stemcell `#{stemcell_id}'...")
         image = @glance.images.find_by_id(stemcell_id)
 
         kernel_id = image.properties["kernel_id"]
@@ -149,7 +149,7 @@ module Bosh::OpenStackCloud
           kernel = @glance.images.find_by_id(kernel_id)
           if kernel.properties["stemcell"]
             if kernel.properties["stemcell"] == image.name
-              @logger.info("Deleting `#{stemcell_id}' stemcell kernel")
+              @logger.info("Deleting stemcell kernel `#{stemcell_id}'...")
               kernel.destroy
             end
           end
@@ -160,7 +160,7 @@ module Bosh::OpenStackCloud
           ramdisk = @glance.images.find_by_id(ramdisk_id)
           if ramdisk.properties["stemcell"]
             if ramdisk.properties["stemcell"] == image.name
-              @logger.info("Deleting `#{stemcell_id}' stemcell ramdisk")
+              @logger.info("Deleting stemcell ramdisk `#{stemcell_id}'...")
               ramdisk.destroy
             end
           end
@@ -230,15 +230,14 @@ module Bosh::OpenStackCloud
 
         @logger.info("Creating new server...")
         server = @openstack.servers.create(server_params)
-        state = server.state
 
-        @logger.info("Creating new server `#{server.id}', state is `#{state}'")
-        wait_resource(server, state, :active, :state)
+        @logger.info("Creating new server `#{server.id}'...")
+        wait_resource(server, :active, :state)
 
-        @logger.info("Configuring network for `#{server.id}'")
+        @logger.info("Configuring network for `#{server.id}'...")
         network_configurator.configure(@openstack, server)
 
-        @logger.info("Updating server settings for `#{server.id}'")
+        @logger.info("Updating server settings for `#{server.id}'...")
         settings = initial_agent_settings(server_name, agent_id, network_spec, environment)
         @registry.update_settings(server.name, settings)
 
@@ -252,15 +251,12 @@ module Bosh::OpenStackCloud
     def delete_vm(server_id)
       with_thread_name("delete_vm(#{server_id})") do
         server = @openstack.servers.get(server_id)
-        @logger.info("Deleting server `#{server_id}'")
+        @logger.info("Deleting server `#{server_id}'...")
         if server
-          state = server.state
-
-          @logger.info("Deleting server `#{server.id}', state is `#{state}'")
           server.destroy
-          wait_resource(server, state, :terminated, :state)
+          wait_resource(server, :terminated, :state, true)
 
-          @logger.info("Deleting server settings for `#{server.id}'")
+          @logger.info("Deleting server settings for `#{server.id}'...")
           @registry.delete_settings(server.name)
         end
       end
@@ -330,10 +326,9 @@ module Bosh::OpenStackCloud
 
         @logger.info("Creating new volume...")
         volume = @openstack.volumes.create(volume_params)
-        state = volume.status
 
-        @logger.info("Creating new volume `#{volume.id}', state is `#{state}'")
-        wait_resource(volume, state, :available)
+        @logger.info("Creating new volume `#{volume.id}'...")
+        wait_resource(volume, :available)
 
         volume.id.to_s
       end
@@ -349,9 +344,9 @@ module Bosh::OpenStackCloud
 
         cloud_error("Cannot delete volume `#{disk_id}', state is #{state}") if state.to_sym != :available
 
-        @logger.info("Deleting volume `#{disk_id}', state is `#{state}'")
+        @logger.info("Deleting volume `#{disk_id}'...")
         volume.destroy
-        wait_resource(volume, state, :deleted)
+        wait_resource(volume, :deleted, :status, true)
       end
     end
 
@@ -439,7 +434,7 @@ module Bosh::OpenStackCloud
       end
 
       # TODO uncomment to test registry
-      @logger.info("Updating server settings for `#{server.id}'")
+      @logger.info("Updating server settings for `#{server.id}'...")
       settings = @registry.read_settings(server.name)
       yield settings
       @registry.update_settings(server.name, settings)
@@ -453,22 +448,18 @@ module Bosh::OpenStackCloud
     # Soft reboots an OpenStack server
     # @param [Fog::Compute::OpenStack::Server] server OpenStack server
     def soft_reboot(server)
-      state = server.state
-
-      @logger.info("Soft rebooting server `#{server.id}', state is `#{state}'")
+      @logger.info("Soft rebooting server `#{server.id}'...")
       server.reboot
-      wait_resource(server, state, :active, :state)
+      wait_resource(server, :active, :state)
     end
 
     ##
     # Hard reboots an OpenStack server
     # @param [Fog::Compute::OpenStack::Server] server OpenStack server
     def hard_reboot(server)
-      state = server.state
-
-      @logger.info("Hard rebooting server `#{server.id}', state is `#{state}'")
+      @logger.info("Hard rebooting server `#{server.id}'...")
       server.reboot(type = 'HARD')
-      wait_resource(server, state, :active, :state)
+      wait_resource(server, :active, :state)
     end
 
     ##
@@ -488,8 +479,7 @@ module Bosh::OpenStackCloud
         end
         @logger.info("Attaching volume `#{volume.id}' to `#{server.id}', device name is `#{dev_name}'")
         if volume.attach(server.id, dev_name)
-          state = volume.status
-          wait_resource(volume, state, :"in-use")
+          wait_resource(volume, :"in-use")
           new_attachment = dev_name
         end
         break
@@ -514,10 +504,9 @@ module Bosh::OpenStackCloud
         cloud_error("Disk `#{volume.id}' is not attached to server `#{server.id}'")
       end
 
-      state = volume.status
-      @logger.info("Detaching volume `#{volume.id}' from `#{server.id}', state is `#{state}'")
+      @logger.info("Detaching volume `#{volume.id}' from `#{server.id}'...")
       volume.detach(server.id, volume.id)
-      wait_resource(volume, state, :available)
+      wait_resource(volume, :available)
     end
 
     ##
@@ -526,10 +515,9 @@ module Bosh::OpenStackCloud
     def upload_image(image_params)
       @logger.info("Creating new image...")
       image = @glance.images.create(image_params)
-      state = image.status
 
-      @logger.info("Creating new image `#{image.id}', state is `#{state}'")
-      wait_resource(image, state, :active)
+      @logger.info("Creating new image `#{image.id}'...")
+      wait_resource(image, :active)
 
       image.id.to_s
     end

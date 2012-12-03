@@ -28,8 +28,7 @@ describe Bosh::OpenStackCloud::Cloud do
       Dir.should_receive(:mktmpdir).and_yield(@tmp_dir)
       cloud.should_receive(:unpack_image).with(@tmp_dir, "/tmp/foo")
       cloud.should_receive(:generate_unique_name).and_return(unique_name)
-      image.should_receive(:status).and_return(:queued)
-      cloud.should_receive(:wait_resource).with(image, :queued, :active)
+      cloud.should_receive(:wait_resource).with(image, :active)
 
       sc_id = cloud.create_stemcell("/tmp/foo", {
         "container_format" => "ami",
@@ -61,8 +60,7 @@ describe Bosh::OpenStackCloud::Cloud do
       Dir.should_receive(:mktmpdir).and_yield(@tmp_dir)
       cloud.should_receive(:unpack_image).with(@tmp_dir, "/tmp/foo")
       cloud.should_receive(:generate_unique_name).and_return(unique_name)
-      image.should_receive(:status).and_return(:queued)
-      cloud.should_receive(:wait_resource).with(image, :queued, :active)
+      cloud.should_receive(:wait_resource).with(image, :active)
 
       sc_id = cloud.create_stemcell("/tmp/foo", {
         "container_format" => "ami",
@@ -121,12 +119,9 @@ describe Bosh::OpenStackCloud::Cloud do
       cloud.should_receive(:unpack_image).with(@tmp_dir, "/tmp/foo")
       File.stub(:exists?).and_return(true)
       cloud.should_receive(:generate_unique_name).and_return(unique_name)
-      kernel.should_receive(:status).and_return(:queued)
-      cloud.should_receive(:wait_resource).with(kernel, :queued, :active)
-      ramdisk.should_receive(:status).and_return(:queued)
-      cloud.should_receive(:wait_resource).with(ramdisk, :queued, :active)
-      image.should_receive(:status).and_return(:queued)
-      cloud.should_receive(:wait_resource).with(image, :queued, :active)
+      cloud.should_receive(:wait_resource).with(kernel, :active)
+      cloud.should_receive(:wait_resource).with(ramdisk, :active)
+      cloud.should_receive(:wait_resource).with(image, :active)
 
       sc_id = cloud.create_stemcell("/tmp/foo", {
         "container_format" => "ami",
@@ -185,12 +180,9 @@ describe Bosh::OpenStackCloud::Cloud do
       cloud.should_receive(:unpack_image).with(@tmp_dir, "/tmp/foo")
       File.stub(:exists?).and_return(true)
       cloud.should_receive(:generate_unique_name).and_return(unique_name)
-      kernel.should_receive(:status).and_return(:queued)
-      cloud.should_receive(:wait_resource).with(kernel, :queued, :active)
-      ramdisk.should_receive(:status).and_return(:queued)
-      cloud.should_receive(:wait_resource).with(ramdisk, :queued, :active)
-      image.should_receive(:status).and_return(:queued)
-      cloud.should_receive(:wait_resource).with(image, :queued, :active)
+      cloud.should_receive(:wait_resource).with(kernel, :active)
+      cloud.should_receive(:wait_resource).with(ramdisk, :active)
+      cloud.should_receive(:wait_resource).with(image, :active)
 
       sc_id = cloud.create_stemcell("/tmp/foo", {
         "name" => "bosh-stemcell",

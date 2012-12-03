@@ -13,7 +13,7 @@ describe Bosh::OpenStackCloud::Cloud do
 
     volume.should_receive(:status).and_return(:available)
     volume.should_receive(:destroy).and_return(true)
-    cloud.should_receive(:wait_resource).with(volume, :available, :deleted)
+    cloud.should_receive(:wait_resource).with(volume, :deleted, :status, true)
 
     cloud.delete_disk("v-foobar")
   end

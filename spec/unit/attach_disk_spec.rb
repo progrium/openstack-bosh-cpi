@@ -21,8 +21,7 @@ describe Bosh::OpenStackCloud::Cloud do
     end
 
     volume.should_receive(:attach).with(server.id, "/dev/vdc").and_return(attachment)
-    volume.should_receive(:status).and_return(:available)
-    cloud.should_receive(:wait_resource).with(volume, :available, :"in-use")
+    cloud.should_receive(:wait_resource).with(volume, :"in-use")
 
     old_settings = { "foo" => "bar" }
     new_settings = {
@@ -53,8 +52,7 @@ describe Bosh::OpenStackCloud::Cloud do
     end
 
     volume.should_receive(:attach).with(server.id, "/dev/vde").and_return(attachment)
-    volume.should_receive(:status).and_return(:available)
-    cloud.should_receive(:wait_resource).with(volume, :available, :"in-use")
+    cloud.should_receive(:wait_resource).with(volume, :"in-use")
 
     old_settings = { "foo" => "bar" }
     new_settings = {

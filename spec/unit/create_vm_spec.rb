@@ -64,8 +64,7 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
 
     cloud.should_receive(:generate_unique_name).and_return(unique_name)
     address.should_receive(:server=).with(nil)
-    server.should_receive(:state).and_return(:build)
-    cloud.should_receive(:wait_resource).with(server, :build, :active, :state)
+    cloud.should_receive(:wait_resource).with(server, :active, :state)
 
     @registry.should_receive(:update_settings).with("i-test", agent_settings(unique_name))
 
@@ -102,8 +101,7 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
     end
 
     cloud.should_receive(:generate_unique_name).and_return(unique_name)
-    server.should_receive(:state).and_return(:build)
-    cloud.should_receive(:wait_resource).with(server, :build, :active, :state)
+    cloud.should_receive(:wait_resource).with(server, :active, :state)
 
     @registry.should_receive(:update_settings).with("i-test", agent_settings(unique_name, network_spec))
 
@@ -129,8 +127,7 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
 
     address.should_receive(:server=).with(nil)
     address.should_receive(:server=).with(server)
-    server.should_receive(:state).and_return(:build)
-    cloud.should_receive(:wait_resource).with(server, :build, :active, :state)
+    cloud.should_receive(:wait_resource).with(server, :active, :state)
 
     @registry.should_receive(:update_settings)
 
