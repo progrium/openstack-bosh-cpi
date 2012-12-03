@@ -274,15 +274,30 @@ module Bosh::OpenStackCloud
 
     ##
     # Configures networking on existing OpenStack server
+    #
     # @param [String] server_id Running OpenStack server id
-    # @param [Hash] network_spec raw network spec passed by director
+    # @param [Hash] network_spec Raw network spec passed by director
     def configure_networks(server_id, network_spec)
       with_thread_name("configure_networks(#{server_id}, ...)") do
         @logger.info("Configuring `#{server_id}' to use the following " \
                      "network settings: #{network_spec.pretty_inspect}")
 
-        server = @openstack.servers.get(server_id)
         network_configurator = NetworkConfigurator.new(network_spec)
+        server = @openstack.servers.get(server_id)
+
+        sg = @openstack.list_security_groups(server_id).body["security_groups"]
+        actual = sg.collect { |s| s["name"] }.sort
+        new = network_configurator.security_groups(@default_security_groups)
+
+        # If the security groups change, we need to recreate the VM
+        # as you can't change the security group of a running server,
+        # we need to send the InstanceUpdater a request to do it for us
+        unless actual == new
+          raise Bosh::Clouds::NotSupported,
+                "security groups change requires VM recreation: %s to %s" %
+                [actual.join(", "), new.join(", ")]
+        end
+
         network_configurator.configure(@openstack, server)
 
         update_agent_settings(server) do |settings|

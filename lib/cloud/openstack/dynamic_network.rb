@@ -2,7 +2,7 @@
 
 module Bosh::OpenStackCloud
   ##
-  #
+  # Represents OpenStack dynamic network: where IaaS sets VM's IP
   class DynamicNetwork < Network
 
     ##
@@ -17,8 +17,10 @@ module Bosh::OpenStackCloud
     ##
     # Configures OpenStack dynamic network. Right now it's a no-op,
     # as dynamic networks are completely managed by OpenStack
+    #
     # @param [Fog::Compute::OpenStack] openstack Fog OpenStack Compute client
-    # @param [Fog::Compute::OpenStack::Server] server OpenStack server to configure
+    # @param [Fog::Compute::OpenStack::Server] server OpenStack server to
+    #   configure
     def configure(openstack, server)
     end
 
