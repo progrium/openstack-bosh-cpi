@@ -60,7 +60,12 @@ module Bosh::OpenStackCloud
         begin
           Dir.mktmpdir do |tmp_dir|
             @logger.info("Extracting stemcell to `#{tmp_dir}'")
-            image_name = "BOSH-#{generate_unique_name}"
+            if cloud_properties["name"] && cloud_properties["version"]
+              image_name = cloud_properties["name"] + "-" +
+                           cloud_properties["version"]
+            else
+              image_name = "BOSH-#{generate_unique_name}"
+            end
 
             # 1. Unpack image to temp directory
             unpack_image(tmp_dir, image_path)
@@ -76,7 +81,7 @@ module Bosh::OpenStackCloud
                 cloud_error("Kernel image is missing from stemcell archive")
               end
               kernel_params = {
-                :name => "AKI-#{image_name}",
+                :name => "#{image_name}-AKI",
                 :disk_format => "aki",
                 :container_format => "aki",
                 :location => kernel_image,
@@ -97,7 +102,7 @@ module Bosh::OpenStackCloud
                 cloud_error("Ramdisk image is missing from stemcell archive")
               end
               ramdisk_params = {
-                :name => "ARI-#{image_name}",
+                :name => "#{image_name}-ARI",
                 :disk_format => "ari",
                 :container_format => "ari",
                 :location => ramdisk_image,
