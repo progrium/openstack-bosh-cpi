@@ -138,29 +138,31 @@ module Bosh::OpenStackCloud
         @logger.info("Deleting `#{stemcell_id}' stemcell")
         image = @glance.images.find_by_id(stemcell_id)
 
-        kernel_id = image.properties["kernel_id"]
-        if kernel_id
-          kernel = @glance.images.find_by_id(kernel_id)
-          if kernel.properties["stemcell"]
-            if kernel.properties["stemcell"] == image.name
-              @logger.info("Deleting `#{stemcell_id}' stemcell kernel")
-              kernel.destroy
+        if image
+          kernel_id = image.properties["kernel_id"]
+          if kernel_id
+            kernel = @glance.images.find_by_id(kernel_id)
+            if kernel.properties["stemcell"]
+              if kernel.properties["stemcell"] == image.name
+                @logger.info("Deleting `#{stemcell_id}' stemcell kernel")
+                kernel.destroy
+              end
             end
           end
-        end
 
-        ramdisk_id = image.properties["ramdisk_id"]
-        if ramdisk_id
-          ramdisk = @glance.images.find_by_id(ramdisk_id)
-          if ramdisk.properties["stemcell"]
-            if ramdisk.properties["stemcell"] == image.name
-              @logger.info("Deleting `#{stemcell_id}' stemcell ramdisk")
-              ramdisk.destroy
+          ramdisk_id = image.properties["ramdisk_id"]
+          if ramdisk_id
+            ramdisk = @glance.images.find_by_id(ramdisk_id)
+            if ramdisk.properties["stemcell"]
+              if ramdisk.properties["stemcell"] == image.name
+                @logger.info("Deleting `#{stemcell_id}' stemcell ramdisk")
+                ramdisk.destroy
+              end
             end
           end
-        end
 
-        image.destroy
+          image.destroy
+        end
       end
     end
 
