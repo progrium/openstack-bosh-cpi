@@ -9,6 +9,7 @@ module Bosh::OpenStackCloud
     attr_reader :openstack
     attr_reader :registry
     attr_reader :glance
+    attr_accessor :logger
 
     ##
     # Creates a new BOSH OpenStack CPI
