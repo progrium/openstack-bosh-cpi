@@ -180,30 +180,36 @@ module Bosh::OpenStackCloud
       with_thread_name("delete_stemcell(#{stemcell_id})") do
         @logger.info("Deleting stemcell `#{stemcell_id}'...")
         image = @glance.images.find_by_id(stemcell_id)
-
-        kernel_id = image.properties["kernel_id"]
-        if kernel_id
-          kernel = @glance.images.find_by_id(kernel_id)
-          if kernel.properties["stemcell"]
-            if kernel.properties["stemcell"] == image.name
-              @logger.info("Deleting stemcell kernel `#{stemcell_id}'...")
-              kernel.destroy
+        if image
+          kernel_id = image.properties["kernel_id"]
+          if kernel_id
+            kernel = @glance.images.find_by_id(kernel_id)
+            if kernel && kernel.properties["stemcell"]
+              if kernel.properties["stemcell"] == image.name
+                @logger.info("Deleting kernel `#{kernel_id}'...")
+                kernel.destroy
+                @logger.info("Kernel `#{kernel_id}' is now deleted")
+              end
             end
           end
-        end
 
-        ramdisk_id = image.properties["ramdisk_id"]
-        if ramdisk_id
-          ramdisk = @glance.images.find_by_id(ramdisk_id)
-          if ramdisk.properties["stemcell"]
-            if ramdisk.properties["stemcell"] == image.name
-              @logger.info("Deleting stemcell ramdisk `#{stemcell_id}'...")
-              ramdisk.destroy
+          ramdisk_id = image.properties["ramdisk_id"]
+          if ramdisk_id
+            ramdisk = @glance.images.find_by_id(ramdisk_id)
+            if ramdisk && ramdisk.properties["stemcell"]
+              if ramdisk.properties["stemcell"] == image.name
+                @logger.info("Deleting ramdisk `#{ramdisk_id}'...")
+                ramdisk.destroy
+                @logger.info("Ramdisk `#{ramdisk_id}' is now deleted")
+              end
             end
           end
-        end
 
-        image.destroy
+          image.destroy
+          @logger.info("Stemcell `#{stemcell_id}' is now deleted")
+        else
+          @logger.info("Stemcell `#{stemcell_id}' not found. Skipping.")
+        end
       end
     end
 
@@ -304,6 +310,8 @@ module Bosh::OpenStackCloud
 
           @logger.info("Deleting settings for server `#{server.id}'...")
           @registry.delete_settings(server.name)
+        else
+          @logger.info("Server `#{server_id}' not found. Skipping.")
         end
       end
     end
@@ -385,7 +393,7 @@ module Bosh::OpenStackCloud
 
         if server_id
           server = @openstack.servers.get(server_id)
-          if server.availability_zone
+          if server && server.availability_zone
             volume_params[:availability_zone] = server.availability_zone
           end
         end
@@ -408,16 +416,19 @@ module Bosh::OpenStackCloud
     # @raise [Bosh::Clouds::CloudError] if disk is not in available state
     def delete_disk(disk_id)
       with_thread_name("delete_disk(#{disk_id})") do
-        volume = @openstack.volumes.get(disk_id)
-
-        state = volume.status
-        if state.to_sym != :available
-          cloud_error("Cannot delete volume `#{disk_id}', state is #{state}")
-        end
-
         @logger.info("Deleting volume `#{disk_id}'...")
-        volume.destroy
-        wait_resource(volume, :deleted, :status, true)
+        volume = @openstack.volumes.get(disk_id)
+        if volume
+          state = volume.status
+          if state.to_sym != :available
+            cloud_error("Cannot delete volume `#{disk_id}', state is #{state}")
+          end
+
+          volume.destroy
+          wait_resource(volume, :deleted, :status, true)
+        else
+          @logger.info("Volume `#{disk_id}' not found. Skipping.")
+        end
       end
     end
 
@@ -430,7 +441,13 @@ module Bosh::OpenStackCloud
     def attach_disk(server_id, disk_id)
       with_thread_name("attach_disk(#{server_id}, #{disk_id})") do
         server = @openstack.servers.get(server_id)
+        unless server
+          cloud_error("Server `#{server_id}' not found")
+        end
         volume = @openstack.volumes.get(disk_id)
+        unless server
+          cloud_error("Volume `#{disk_id}' not found")
+        end
 
         device_name = attach_volume(server, volume)
 
@@ -451,7 +468,13 @@ module Bosh::OpenStackCloud
     def detach_disk(server_id, disk_id)
       with_thread_name("detach_disk(#{server_id}, #{disk_id})") do
         server = @openstack.servers.get(server_id)
+        unless server
+          cloud_error("Server `#{server_id}' not found")
+        end
         volume = @openstack.volumes.get(disk_id)
+        unless server
+          cloud_error("Volume `#{disk_id}' not found")
+        end
 
         detach_volume(server, volume)
 
@@ -651,9 +674,7 @@ module Bosh::OpenStackCloud
     def upload_image(image_params)
       @logger.info("Creating new image...")
       image = @glance.images.create(image_params)
-
-      @logger.info("Creating new image `#{image.id}'...")
-      wait_resource(image, :active)
+      @logger.info("Created new image `#{image.id}'")
 
       image.id.to_s
     end
