@@ -36,7 +36,8 @@ module Bosh::OpenStackCloud
         :openstack_auth_url => @openstack_properties["auth_url"],
         :openstack_username => @openstack_properties["username"],
         :openstack_api_key => @openstack_properties["api_key"],
-        :openstack_tenant => @openstack_properties["tenant"]
+        :openstack_tenant => @openstack_properties["tenant"],
+        :openstack_region => @openstack_properties["region"]
       }
       @openstack = Fog::Compute.new(openstack_params)
       @glance = Fog::Image.new(openstack_params)

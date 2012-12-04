@@ -17,6 +17,8 @@ These options are passed to the OpenStack CPI when it is instantiated.
   OpenStack API key
 * `tenant` (required)
   OpenStack tenant name
+* `region` (optional)
+  OpenStack region
 * `default_key_name` (required)
   default OpenStack ssh key name to assign to created virtual machines
 * `default_security_group` (required)
@@ -95,6 +97,7 @@ This is a sample of how OpenStack specific properties are used in a BOSH deploym
         username: christopher
         api_key: QRoqsenPsNGX6
         tenant: Bosh
+        region: us-west
         default_key_name: bosh
         default_security_groups: ["bosh"]
         private_key: /home/bosh/.ssh/bosh.pem
