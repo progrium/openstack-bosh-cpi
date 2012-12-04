@@ -3,6 +3,10 @@
 require File.expand_path("../../spec_helper", __FILE__)
 
 describe Bosh::OpenStackCloud::Helpers do
+  before(:each) do
+    Bosh::Clouds::Config.stub(:task_checkpoint)
+  end
+
   it "should time out" do
     cloud = mock_cloud
 

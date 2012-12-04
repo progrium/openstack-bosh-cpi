@@ -30,6 +30,8 @@ module Bosh::OpenStackCloud
       desc = resource.class.name.split("::").last.to_s + " " + resource.id.to_s
 
       loop do
+        task_checkpoint
+
         duration = Time.now - started_at
 
         if duration > timeout
