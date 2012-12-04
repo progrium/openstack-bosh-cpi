@@ -84,7 +84,7 @@ module Bosh::OpenStackCloud
       if resource.reload.nil?
          raise("Resource not found") unless allow_notfound
       end
-      resource.send(state_method).downcase
+      resource.send(state_method).downcase.to_sym
     rescue Exception => e
       yield e
     end
