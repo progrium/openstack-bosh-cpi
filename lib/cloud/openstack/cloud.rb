@@ -324,6 +324,9 @@ module Bosh::OpenStackCloud
     def reboot_vm(server_id)
       with_thread_name("reboot_vm(#{server_id})") do
         server = @openstack.servers.get(server_id)
+        unless server
+          cloud_error("Server `#{server_id}' not found")
+        end
         soft_reboot(server)
       end
     end
