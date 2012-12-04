@@ -43,8 +43,14 @@ module Bosh::OpenStackCloud
                         "(#{duration}s)")
         end
 
-        state = get_state_for(resource, state_method, allow_notfound) do |error|
-          cloud_error("#{desc}: #{error.message}")
+        # If resource reload is nil, perhaps it's because resource went away
+        # (ie: a destroy operation). Don't raise an exception if this is
+        # expected (allow_notfound).
+        if resource.reload.nil?
+          break if allow_notfound
+          cloud_error("#{desc}: Resource not found")
+        else
+          state = resource.send(state_method).downcase.to_sym
         end
 
         # This is not a very strong convention, but some resources
@@ -65,28 +71,6 @@ module Bosh::OpenStackCloud
         total = Time.now - started_at
         @logger.info("#{desc} is now #{target_state}, took #{total}s")
       end
-    end
-
-    private
-
-    ##
-    # Gets a resource state
-    #
-    # @param [Fog::Model] resource Resource to query
-    # @param [Symbol] state_method Resource's method to fetch state
-    # @param [Boolean] allow_notfound true if resource could be not found
-    # @return [Symbol] Resource's state
-    def get_state_for(resource, state_method, allow_notfound)
-      # If resource reload is nil, perhaps it's because resource went away
-      # (ie: a destroy operation). Don't raise an exception if this is
-      # expected (allow_notfound) and return the latest know state (fog model
-      # doesn't destroy the object if reload fails)
-      if resource.reload.nil?
-         raise("Resource not found") unless allow_notfound
-      end
-      resource.send(state_method).downcase.to_sym
-    rescue Exception => e
-      yield e
     end
 
   end
