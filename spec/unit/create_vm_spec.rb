@@ -26,7 +26,7 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
 
   def openstack_params(unique_name, user_data, security_groups=[])
     {
-      :name=>"vm-#{unique_name}",
+      :name => "vm-#{unique_name}",
       :image_ref => "sc-id",
       :flavor_ref => "f-test",
       :key_name => "test_key",
@@ -143,6 +143,61 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
     vm_id = cloud.create_vm("agent-id", "sc-id",
                             resource_pool_spec,
                             combined_network_spec)
+  end
+
+  def volume(zone)
+    vol = double("volume")
+    vol.stub(:availability_zone).and_return(zone)
+    vol
+  end
+
+  describe "#select_availability_zone" do
+    it "should return nil when all values are nil" do
+      cloud = mock_cloud
+      cloud.select_availability_zone(nil, nil).should == nil
+    end
+
+    it "should select the resource pool availability_zone when disks are nil" do
+      cloud = mock_cloud
+      cloud.select_availability_zone(nil, "foobar-1a").should == "foobar-1a"
+    end
+
+    it "should select the zone from a list of disks" do
+      cloud = mock_cloud do |openstack|
+        openstack.volumes.stub(:get).and_return(volume("foo"), volume("foo"))
+      end
+      cloud.select_availability_zone(%w[cid1 cid2], nil).should == "foo"
+    end
+
+    it "should select the zone from a list of disks and a default" do
+      cloud = mock_cloud do |openstack|
+        openstack.volumes.stub(:get).and_return(volume("foo"), volume("foo"))
+      end
+      cloud.select_availability_zone(%w[cid1 cid2], "foo").should == "foo"
+    end
+  end
+
+  describe "#ensure_same_availability_zone" do
+    it "should raise an error when the zones differ" do
+      cloud = mock_cloud
+      expect {
+        cloud.ensure_same_availability_zone([volume("foo"), volume("bar")], nil)
+      }.to raise_error Bosh::Clouds::CloudError
+    end
+
+    it "should raise an error when the zones differ" do
+      cloud = mock_cloud
+      expect {
+        cloud.ensure_same_availability_zone([volume("foo"), volume("bar")], "foo")
+      }.to raise_error Bosh::Clouds::CloudError
+    end
+
+    it "should raise an error when the zones differ" do
+      cloud = mock_cloud
+      expect {
+        cloud.ensure_same_availability_zone([volume("foo"), volume("foo")], "bar")
+      }.to raise_error Bosh::Clouds::CloudError
+    end
   end
 
 end

@@ -45,6 +45,8 @@ These options are specified under `cloud_options` in the `resource_pools` sectio
 
 * `instance_type` (required)
   which type of instance (OpenStack flavor) the VMs should belong to
+* `availability_zone` (optional)
+  the OpenStack availability zone the VMs should be created in
 
 ### Network options
 

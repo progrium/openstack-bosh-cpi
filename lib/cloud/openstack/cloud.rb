@@ -6,8 +6,6 @@ module Bosh::OpenStackCloud
   class Cloud < Bosh::Cloud
     include Helpers
 
-    DEFAULT_AVAILABILITY_ZONE = "nova"
-
     attr_reader :openstack
     attr_reader :registry
     attr_reader :glance
@@ -255,7 +253,8 @@ module Bosh::OpenStackCloud
           :user_data => Yajl::Encoder.encode(user_data)
         }
 
-        availability_zone = resource_pool["availability_zone"]
+        availability_zone = select_availability_zone(disk_locality,
+                              resource_pool["availability_zone"])
         if availability_zone
           server_params[:availability_zone] = availability_zone
         end
@@ -366,19 +365,18 @@ module Bosh::OpenStackCloud
           cloud_error("Maximum disk size is 1 TiB")
         end
 
-        if server_id
-          server = @openstack.servers.get(server_id)
-          availability_zone = server.availability_zone
-        else
-          availability_zone = DEFAULT_AVAILABILITY_ZONE
-        end
-
         volume_params = {
           :name => "volume-#{generate_unique_name}",
           :description => "",
-          :size => (size / 1024.0).ceil,
-          :availability_zone => availability_zone
+          :size => (size / 1024.0).ceil
         }
+
+        if server_id
+          server = @openstack.servers.get(server_id)
+          if server.availability_zone
+            volume_params[:availability_zone] = server.availability_zone
+          end
+        end
 
         @logger.info("Creating new volume...")
         volume = @openstack.volumes.create(volume_params)
@@ -459,6 +457,42 @@ module Bosh::OpenStackCloud
     # @note Not implemented in the OpenStack CPI
     def validate_deployment(old_manifest, new_manifest)
       not_implemented(:validate_deployment)
+    end
+
+    ##
+    # Selects the availability zone to use from a list of disk volumes,
+    # resource pool availability zone (if any) and the default availability
+    # zone.
+    #
+    # @param [Array] volumes OpenStack volume UUIDs to attach to the vm
+    # @param [String] resource_pool_az availability zone specified in
+    #   the resource pool (may be nil)
+    # @return [String] availability zone to use or nil
+    # @note this is a private method that is public to make it easier to test
+    def select_availability_zone(volumes, resource_pool_az)
+      if volumes && !volumes.empty?
+        disks = volumes.map { |vid| @openstack.volumes.get(vid) }
+        ensure_same_availability_zone(disks, resource_pool_az)
+        disks.first.availability_zone
+      else
+        resource_pool_az
+      end
+    end
+
+    ##
+    # Ensure all supplied availability zones are the same
+    #
+    # @param [Array] disks OpenStack volumes
+    # @param [String] default availability zone specified in
+    #   the resource pool (may be nil)
+    # @return [String] availability zone to use or nil
+    # @note this is a private method that is public to make it easier to test
+    def ensure_same_availability_zone(disks, default)
+      zones = disks.map { |disk| disk.availability_zone }
+      zones << default if default
+      zones.uniq!
+      cloud_error "can't use multiple availability zones: %s" %
+        zones.join(", ") unless zones.size == 1 || zones.empty?
     end
 
     private

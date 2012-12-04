@@ -9,8 +9,7 @@ describe Bosh::OpenStackCloud::Cloud do
     disk_params = {
       :name => "volume-#{unique_name}",
       :description => "",
-      :size => 2,
-      :availability_zone => "nova"
+      :size => 2
     }
     volume = double("volume", :id => "v-foobar")
 
@@ -29,8 +28,7 @@ describe Bosh::OpenStackCloud::Cloud do
     disk_params = {
       :name => "volume-#{unique_name}",
       :description => "",
-      :size => 3,
-      :availability_zone => "nova"
+      :size => 3
     }
     volume = double("volume", :id => "v-foobar")
 
