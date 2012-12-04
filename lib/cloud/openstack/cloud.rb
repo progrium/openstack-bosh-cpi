@@ -102,6 +102,7 @@ module Bosh::OpenStackCloud
                   :stemcell => image_name
                 }
               }
+              @logger.info("Uploading kernel image...")
               kernel_id = upload_image(kernel_params)
             end
 
@@ -125,6 +126,7 @@ module Bosh::OpenStackCloud
                   :stemcell => image_name
                 }
               }
+              @logger.info("Uploading ramdisk image...")
               ramdisk_id = upload_image(ramdisk_params)
             end
 
@@ -148,7 +150,7 @@ module Bosh::OpenStackCloud
             unless image_properties.empty?
               image_params[:properties] = image_properties
             end
-
+            @logger.info("Uploading image...")
             upload_image(image_params)
           end
         rescue => e
