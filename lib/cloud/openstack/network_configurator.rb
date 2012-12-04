@@ -8,7 +8,6 @@ module Bosh::OpenStackCloud
   # a number of sanity checks for the network spec provided by director
   # to make sure we don't apply something OpenStack doesn't understand how to
   # deal with.
-  #
   class NetworkConfigurator
     include Helpers
 

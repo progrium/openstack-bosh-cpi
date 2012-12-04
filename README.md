@@ -19,7 +19,7 @@ Cloud Foundry is the leading open source platform-as-a-service (PaaS) offering w
 Cloud Foundry BOSH is an open source tool chain for release engineering, deployment and lifecycle management of large scale distributed services. In this manual we describe the architecture, topology, configuration, and use of BOSH, as well as the structure and conventions used in packaging and deployment.
 
  * BOSH Source Code: https://github.com/cloudfoundry/bosh
- * BOSH Documentation: https://github.com/cloudfoundry/oss-docs/blob/master/bosh/documentation/documentation.md
+ * BOSH Documentation: https://github.com/cloudfoundry/oss-docs/blob/master/bosh/documentation.md
 
 ## OpenStack and Cloud Foundry, Together using BOSH
 

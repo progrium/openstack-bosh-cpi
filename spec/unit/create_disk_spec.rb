@@ -47,11 +47,11 @@ describe Bosh::OpenStackCloud::Cloud do
   it "check min and max disk size" do
     expect {
       mock_cloud.create_disk(100)
-    }.to raise_error(Bosh::Clouds::CloudError, /minimum disk size is 1 GiB/)
+    }.to raise_error(Bosh::Clouds::CloudError, /Minimum disk size is 1 GiB/)
 
     expect {
       mock_cloud.create_disk(2000 * 1024)
-    }.to raise_error(Bosh::Clouds::CloudError, /maximum disk size is 1 TiB/)
+    }.to raise_error(Bosh::Clouds::CloudError, /Maximum disk size is 1 TiB/)
   end
 
   it "puts disk in the same AZ as a server" do
