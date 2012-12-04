@@ -114,7 +114,7 @@ module Bosh::OpenStackCloud
     def delete_settings(server_id)
       url = "#{@endpoint}/servers/#{server_id}/settings"
 
-      response = @client.delete(url, @headers)
+      response = @client.delete(url, {}, @headers)
       if response.status != 200
         cloud_error("Cannot delete settings for `#{server_id}', " \
                     "got HTTP #{response.status}")
