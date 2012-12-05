@@ -253,14 +253,14 @@ module Bosh::OpenStackCloud
         if image.nil?
           cloud_error("Image #{stemcell_id} not found")
         end
-        @logger.debug("Using image: #{image.name}")
+        @logger.debug("Using image: #{stemcell_id}")
 
         flavor = @openstack.flavors.find { |f|
           f.name == resource_pool["instance_type"] }
         if flavor.nil?
           cloud_error("Flavor #{resource_pool["instance_type"]} not found")
         end
-        @logger.debug("Using flavor: #{flavor.name}")
+        @logger.debug("Using flavor: #{resource_pool["instance_type"]}")
 
         server_params = {
           :name => server_name,
