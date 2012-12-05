@@ -11,12 +11,17 @@ describe Bosh::OpenStackCloud::Cloud do
   it "detaches an OpenStack volume from a server" do
     server = double("server", :id => "i-test", :name => "i-test")
     volume = double("volume", :id => "v-foobar")
-    volume_attachments = double("body", :body => {"volumeAttachments" => [{"volumeId" => "v-foobar"}, {"volumeId" => "v-barfoo"}]})
+    volume_attachments = double("body", :body => {"volumeAttachments" =>
+                                                   [{"volumeId" => "v-foobar"},
+                                                   {"volumeId" => "v-barfoo"}]})
 
     cloud = mock_cloud do |openstack|
-      openstack.servers.should_receive(:get).with("i-test").and_return(server)
-      openstack.volumes.should_receive(:get).with("v-foobar").and_return(volume)
-      openstack.should_receive(:get_server_volumes).and_return(volume_attachments)
+      openstack.servers.should_receive(:get).
+        with("i-test").and_return(server)
+      openstack.volumes.should_receive(:get).
+        with("v-foobar").and_return(volume)
+      openstack.should_receive(:get_server_volumes).
+        and_return(volume_attachments)
     end
 
     volume.should_receive(:detach).with(server.id, "v-foobar").and_return(true)
@@ -41,8 +46,10 @@ describe Bosh::OpenStackCloud::Cloud do
       }
     }
 
-    @registry.should_receive(:read_settings).with("i-test").and_return(old_settings)
-    @registry.should_receive(:update_settings).with("i-test", new_settings)
+    @registry.should_receive(:read_settings).
+      with("i-test").and_return(old_settings)
+    @registry.should_receive(:update_settings).
+      with("i-test", new_settings)
 
     cloud.detach_disk("i-test", "v-foobar")
   end
@@ -50,12 +57,17 @@ describe Bosh::OpenStackCloud::Cloud do
   it "raises an error when volume is not attached to a server" do
     server = double("server", :id => "i-test", :name => "i-test")
     volume = double("volume", :id => "v-barfoo")
-    volume_attachments = double("body", :body => {"volumeAttachments" => [{"volumeId" => "v-foobar"}]})
+    volume_attachments = double("body",
+                                :body => {"volumeAttachments" =>
+                                            [{"volumeId" => "v-foobar"}]})
 
     cloud = mock_cloud do |openstack|
-      openstack.servers.should_receive(:get).with("i-test").and_return(server)
-      openstack.volumes.should_receive(:get).with("v-barfoo").and_return(volume)
-      openstack.should_receive(:get_server_volumes).and_return(volume_attachments)
+      openstack.servers.should_receive(:get).
+        with("i-test").and_return(server)
+      openstack.volumes.should_receive(:get).
+        with("v-barfoo").and_return(volume)
+      openstack.should_receive(:get_server_volumes).
+        and_return(volume_attachments)
     end
 
     expect {

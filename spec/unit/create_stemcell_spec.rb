@@ -10,7 +10,7 @@ describe Bosh::OpenStackCloud::Cloud do
 
   describe "Image upload based flow" do
 
-    it "creates stemcell by uploading an image without kernel nor ramdisk" do
+    it "creates stemcell using an image without kernel nor ramdisk" do
       image = double("image", :id => "i-bar", :name => "i-bar")
       unique_name = UUIDTools::UUID.random_create.to_s
       image_params = {
@@ -22,7 +22,8 @@ describe Bosh::OpenStackCloud::Cloud do
       }
 
       cloud = mock_glance do |glance|
-        glance.images.should_receive(:create).with(image_params).and_return(image)
+        glance.images.should_receive(:create).
+          with(image_params).and_return(image)
       end
 
       Dir.should_receive(:mktmpdir).and_yield(@tmp_dir)
@@ -37,7 +38,7 @@ describe Bosh::OpenStackCloud::Cloud do
       sc_id.should == "i-bar"
     end
 
-    it "creates stemcell by uploading an image using kernel and ramdisk id's" do
+    it "creates stemcell using an image with kernel and ramdisk id's" do
       image = double("image", :id => "i-bar", :name => "i-bar")
       unique_name = UUIDTools::UUID.random_create.to_s
       image_params = {
@@ -53,7 +54,8 @@ describe Bosh::OpenStackCloud::Cloud do
       }
 
       cloud = mock_glance do |glance|
-        glance.images.should_receive(:create).with(image_params).and_return(image)
+        glance.images.should_receive(:create).
+          with(image_params).and_return(image)
       end
 
       Dir.should_receive(:mktmpdir).and_yield(@tmp_dir)
@@ -72,7 +74,7 @@ describe Bosh::OpenStackCloud::Cloud do
       sc_id.should == "i-bar"
     end
 
-    it "creates stemcell by uploading image, kernel and ramdisk" do
+    it "creates stemcell using an image with kernel and ramdisk files" do
       image = double("image", :id => "i-bar", :name => "i-bar")
       kernel = double("image", :id => "k-img-id", :name => "k-img-id")
       ramdisk = double("image", :id => "r-img-id", :name => "r-img-id")
@@ -108,9 +110,12 @@ describe Bosh::OpenStackCloud::Cloud do
       }
 
       cloud = mock_glance do |glance|
-        glance.images.should_receive(:create).with(kernel_params).and_return(kernel)
-        glance.images.should_receive(:create).with(ramdisk_params).and_return(ramdisk)
-        glance.images.should_receive(:create).with(image_params).and_return(image)
+        glance.images.should_receive(:create).
+          with(kernel_params).and_return(kernel)
+        glance.images.should_receive(:create).
+          with(ramdisk_params).and_return(ramdisk)
+        glance.images.should_receive(:create).
+          with(image_params).and_return(image)
       end
 
       Dir.should_receive(:mktmpdir).and_yield(@tmp_dir)
@@ -128,7 +133,7 @@ describe Bosh::OpenStackCloud::Cloud do
       sc_id.should == "i-bar"
     end
 
-    it "creates stemcell using name and version cloud_properties" do
+    it "sets image properies from cloud_properties" do
       image = double("image", :id => "i-bar", :name => "i-bar")
       kernel = double("image", :id => "k-img-id", :name => "k-img-id")
       ramdisk = double("image", :id => "r-img-id", :name => "r-img-id")
@@ -166,9 +171,12 @@ describe Bosh::OpenStackCloud::Cloud do
       }
 
       cloud = mock_glance do |glance|
-        glance.images.should_receive(:create).with(kernel_params).and_return(kernel)
-        glance.images.should_receive(:create).with(ramdisk_params).and_return(ramdisk)
-        glance.images.should_receive(:create).with(image_params).and_return(image)
+        glance.images.should_receive(:create).
+          with(kernel_params).and_return(kernel)
+        glance.images.should_receive(:create).
+          with(ramdisk_params).and_return(ramdisk)
+        glance.images.should_receive(:create).
+          with(image_params).and_return(image)
       end
 
       Dir.should_receive(:mktmpdir).and_yield(@tmp_dir)

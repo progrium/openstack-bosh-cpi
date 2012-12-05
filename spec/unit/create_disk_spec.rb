@@ -14,7 +14,8 @@ describe Bosh::OpenStackCloud::Cloud do
     volume = double("volume", :id => "v-foobar")
 
     cloud = mock_cloud do |openstack|
-      openstack.volumes.should_receive(:create).with(disk_params).and_return(volume)
+      openstack.volumes.should_receive(:create).
+        with(disk_params).and_return(volume)
     end
 
     cloud.should_receive(:generate_unique_name).and_return(unique_name)
@@ -33,7 +34,8 @@ describe Bosh::OpenStackCloud::Cloud do
     volume = double("volume", :id => "v-foobar")
 
     cloud = mock_cloud do |openstack|
-      openstack.volumes.should_receive(:create).with(disk_params).and_return(volume)
+      openstack.volumes.should_receive(:create).
+        with(disk_params).and_return(volume)
     end
 
     cloud.should_receive(:generate_unique_name).and_return(unique_name)
@@ -60,12 +62,15 @@ describe Bosh::OpenStackCloud::Cloud do
       :size => 1,
       :availability_zone => "foobar-land"
     }
-    server = double("server", :id => "i-test", :availability_zone => "foobar-land")
+    server = double("server", :id => "i-test",
+                    :availability_zone => "foobar-land")
     volume = double("volume", :id => "v-foobar")
 
     cloud = mock_cloud do |openstack|
-      openstack.servers.should_receive(:get).with("i-test").and_return(server)
-      openstack.volumes.should_receive(:create).with(disk_params).and_return(volume)
+      openstack.servers.should_receive(:get).
+        with("i-test").and_return(server)
+      openstack.volumes.should_receive(:create).
+        with(disk_params).and_return(volume)
     end
 
     cloud.should_receive(:generate_unique_name).and_return(unique_name)

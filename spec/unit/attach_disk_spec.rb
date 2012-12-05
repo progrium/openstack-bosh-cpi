@@ -15,12 +15,16 @@ describe Bosh::OpenStackCloud::Cloud do
     attachment = double("attachment", :device => "/dev/vdc")
 
     cloud = mock_cloud do |openstack|
-      openstack.servers.should_receive(:get).with("i-test").and_return(server)
-      openstack.volumes.should_receive(:get).with("v-foobar").and_return(volume)
-      openstack.should_receive(:get_server_volumes).and_return(volume_attachments)
+      openstack.servers.should_receive(:get).
+        with("i-test").and_return(server)
+      openstack.volumes.should_receive(:get).
+        with("v-foobar").and_return(volume)
+      openstack.should_receive(:get_server_volumes).
+        and_return(volume_attachments)
     end
 
-    volume.should_receive(:attach).with(server.id, "/dev/vdc").and_return(attachment)
+    volume.should_receive(:attach).
+      with(server.id, "/dev/vdc").and_return(attachment)
     cloud.should_receive(:wait_resource).with(volume, :"in-use")
 
     old_settings = { "foo" => "bar" }
@@ -33,8 +37,10 @@ describe Bosh::OpenStackCloud::Cloud do
       }
     }
 
-    @registry.should_receive(:read_settings).with("i-test").and_return(old_settings)
-    @registry.should_receive(:update_settings).with("i-test", new_settings)
+    @registry.should_receive(:read_settings).
+      with("i-test").and_return(old_settings)
+    @registry.should_receive(:update_settings).
+      with("i-test", new_settings)
 
     cloud.attach_disk("i-test", "v-foobar")
   end
@@ -42,16 +48,22 @@ describe Bosh::OpenStackCloud::Cloud do
   it "picks available device name" do
     server = double("server", :id => "i-test", :name => "i-test")
     volume = double("volume", :id => "v-foobar")
-    volume_attachments = double("body", :body => {"volumeAttachments" => [{"device" => "/dev/vdc"}, {"device" => "/dev/vdd"}]})
+    volume_attachments = double("body", :body => {"volumeAttachments" =>
+                                                  [{"device" => "/dev/vdc"},
+                                                   {"device" => "/dev/vdd"}]})
     attachment = double("attachment", :device => "/dev/vdd")
 
     cloud = mock_cloud do |openstack|
-      openstack.servers.should_receive(:get).with("i-test").and_return(server)
-      openstack.volumes.should_receive(:get).with("v-foobar").and_return(volume)
-      openstack.should_receive(:get_server_volumes).and_return(volume_attachments)
+      openstack.servers.should_receive(:get).
+        with("i-test").and_return(server)
+      openstack.volumes.should_receive(:get).
+        with("v-foobar").and_return(volume)
+      openstack.should_receive(:get_server_volumes).
+        and_return(volume_attachments)
     end
 
-    volume.should_receive(:attach).with(server.id, "/dev/vde").and_return(attachment)
+    volume.should_receive(:attach).
+      with(server.id, "/dev/vde").and_return(attachment)
     cloud.should_receive(:wait_resource).with(volume, :"in-use")
 
     old_settings = { "foo" => "bar" }
@@ -64,8 +76,10 @@ describe Bosh::OpenStackCloud::Cloud do
       }
     }
 
-    @registry.should_receive(:read_settings).with("i-test").and_return(old_settings)
-    @registry.should_receive(:update_settings).with("i-test", new_settings)
+    @registry.should_receive(:read_settings).
+      with("i-test").and_return(old_settings)
+    @registry.should_receive(:update_settings).
+      with("i-test", new_settings)
 
     cloud.attach_disk("i-test", "v-foobar")
   end
@@ -77,12 +91,16 @@ describe Bosh::OpenStackCloud::Cloud do
       array << {"device" => "/dev/vd#{char}"}
       array
     end
-    volume_attachments = double("body", :body => {"volumeAttachments" => all_mappings})
+    volume_attachments = double("body", :body => {"volumeAttachments" =>
+                                                   all_mappings})
 
     cloud = mock_cloud do |openstack|
-      openstack.servers.should_receive(:get).with("i-test").and_return(server)
-      openstack.volumes.should_receive(:get).with("v-foobar").and_return(volume)
-      openstack.should_receive(:get_server_volumes).and_return(volume_attachments)
+      openstack.servers.should_receive(:get).
+        with("i-test").and_return(server)
+      openstack.volumes.should_receive(:get).
+        with("v-foobar").and_return(volume)
+      openstack.should_receive(:get_server_volumes).
+        and_return(volume_attachments)
     end
 
     expect {

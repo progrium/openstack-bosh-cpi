@@ -181,21 +181,24 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
     it "should raise an error when the zones differ" do
       cloud = mock_cloud
       expect {
-        cloud.ensure_same_availability_zone([volume("foo"), volume("bar")], nil)
+        cloud.ensure_same_availability_zone([volume("foo"), volume("bar")],
+                                            nil)
       }.to raise_error Bosh::Clouds::CloudError
     end
 
     it "should raise an error when the zones differ" do
       cloud = mock_cloud
       expect {
-        cloud.ensure_same_availability_zone([volume("foo"), volume("bar")], "foo")
+        cloud.ensure_same_availability_zone([volume("foo"), volume("bar")],
+                                            "foo")
       }.to raise_error Bosh::Clouds::CloudError
     end
 
     it "should raise an error when the zones differ" do
       cloud = mock_cloud
       expect {
-        cloud.ensure_same_availability_zone([volume("foo"), volume("foo")], "bar")
+        cloud.ensure_same_availability_zone([volume("foo"), volume("foo")],
+                                            "bar")
       }.to raise_error Bosh::Clouds::CloudError
     end
   end
