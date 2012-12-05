@@ -233,6 +233,7 @@ module Bosh::OpenStackCloud
     def create_vm(agent_id, stemcell_id, resource_pool,
                   network_spec = nil, disk_locality = nil, environment = nil)
       with_thread_name("create_vm(#{agent_id}, ...)") do
+        @logger.info("Creating new server...")
         network_configurator = NetworkConfigurator.new(network_spec)
 
         server_name = "vm-#{generate_unique_name}"
@@ -247,20 +248,20 @@ module Bosh::OpenStackCloud
 
         security_groups =
           network_configurator.security_groups(@default_security_groups)
-        @logger.debug("Using security groups: #{security_groups.join(', ')}")
+        @logger.debug("Using security groups: `#{security_groups.join(', ')}'")
 
         image = @openstack.images.find { |i| i.id == stemcell_id }
         if image.nil?
-          cloud_error("Image #{stemcell_id} not found")
+          cloud_error("Image `#{stemcell_id}' not found")
         end
-        @logger.debug("Using image: #{stemcell_id}")
+        @logger.debug("Using image: `#{stemcell_id}'")
 
         flavor = @openstack.flavors.find { |f|
           f.name == resource_pool["instance_type"] }
         if flavor.nil?
-          cloud_error("Flavor #{resource_pool["instance_type"]} not found")
+          cloud_error("Flavor `#{resource_pool["instance_type"]}' not found")
         end
-        @logger.debug("Using flavor: #{resource_pool["instance_type"]}")
+        @logger.debug("Using flavor: `#{resource_pool["instance_type"]}'")
 
         server_params = {
           :name => server_name,
@@ -277,7 +278,6 @@ module Bosh::OpenStackCloud
           server_params[:availability_zone] = availability_zone
         end
 
-        @logger.info("Creating new server...")
         server = @openstack.servers.create(server_params)
 
         @logger.info("Creating new server `#{server.id}'...")
