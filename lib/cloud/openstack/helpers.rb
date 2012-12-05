@@ -27,7 +27,8 @@ module Bosh::OpenStackCloud
                       allow_notfound = false, timeout = DEFAULT_TIMEOUT)
 
       started_at = Time.now
-      desc = resource.class.name.split("::").last.to_s + " " + resource.id.to_s
+      desc = resource.class.name.split("::").last.to_s + " `" +
+             resource.id.to_s + "'"
 
       loop do
         task_checkpoint
