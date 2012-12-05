@@ -676,8 +676,10 @@ module Bosh::OpenStackCloud
     # @return [String] OpenStack image UUID
     def upload_image(image_params)
       @logger.info("Creating new image...")
+      started_at = Time.now
       image = @glance.images.create(image_params)
-      @logger.info("Created new image `#{image.id}'")
+      total = Time.now - started_at
+      @logger.info("Created new image `#{image.id}', took #{total}s")
 
       image.id.to_s
     end
