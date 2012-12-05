@@ -65,7 +65,7 @@ module Bosh::OpenStackCloud
       payload = Yajl::Encoder.encode(settings)
       url = "#{@endpoint}/servers/#{server_id}/settings"
 
-      response = @client.put(url, payload, @headers)
+      response = @client.put(url, {:body => payload, :header => @headers})
       if response.status != 200
         cloud_error("Cannot update settings for `#{server_id}', " \
                     "got HTTP #{response.status}")
@@ -82,7 +82,7 @@ module Bosh::OpenStackCloud
     def read_settings(server_id)
       url = "#{@endpoint}/servers/#{server_id}/settings"
 
-      response = @client.get(url, {}, @headers)
+      response = @client.get(url, {:header => @headers})
       if response.status != 200
         cloud_error("Cannot read settings for `#{server_id}', " \
                     "got HTTP #{response.status}")
@@ -114,7 +114,7 @@ module Bosh::OpenStackCloud
     def delete_settings(server_id)
       url = "#{@endpoint}/servers/#{server_id}/settings"
 
-      response = @client.delete(url, {}, @headers)
+      response = @client.delete(url, {:header => @headers})
       if response.status != 200
         cloud_error("Cannot delete settings for `#{server_id}', " \
                     "got HTTP #{response.status}")
