@@ -13,8 +13,10 @@ require "tempfile"
 # 3. Download a public OpenStack stemcell: 'bosh download public stemcell ...';
 # 4. Untar the OpenStack stemcell, you'll find and image file;
 # 5. Set STEMCELL_FILE env variable to point to OpenStack image file;
-# 6. Start OpenStack Registry manually (see bosh/openstack_registry);
-# 7. Run 'bundle exec rspec --color spec/integration/cpi_test.rb'.
+# 6. Optional: Set FLOATING_IP env variable with an allocated OpenStack
+#    Floating IP if you want to test vip networks;
+# 7. Start OpenStack Registry manually (see bosh/openstack_registry);
+# 8. Run 'bundle exec rspec --color spec/integration/cpi_test.rb'.
 describe Bosh::OpenStackCloud::Cloud do
 
   before(:each) do
@@ -86,6 +88,20 @@ describe Bosh::OpenStackCloud::Cloud do
     settings["disks"]["persistent"].should == { volume_id => "/dev/vdc" }
 
     cpi.reboot_vm(server_id)
+
+    if ENV["FLOATING_IP"]
+      cpi.configure_networks(server_id,
+                             { "default" => { "type" => "dynamic" },
+                               "floating" => { "type" => "vip",
+                                               "ip" => ENV["FLOATING_IP"] }
+                             })
+      settings = cpi.registry.read_settings("vm-#{unique_name}")
+      settings["networks"].should == {
+        "default" => { "type" => "dynamic" },
+        "floating" => { "type" => "vip",
+                        "ip" => ENV["FLOATING_IP"] }
+      }
+    end
 
     cpi.detach_disk(server_id, volume_id)
     settings = cpi.registry.read_settings("vm-#{unique_name}")
