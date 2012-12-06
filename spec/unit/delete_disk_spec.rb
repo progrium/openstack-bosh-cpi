@@ -8,12 +8,13 @@ describe Bosh::OpenStackCloud::Cloud do
     volume = double("volume", :id => "v-foobar")
 
     cloud = mock_cloud do |openstack|
-      openstack.volumes.should_receive(:get).with("v-foobar").and_return(volume)
+      openstack.volumes.should_receive(:get).
+        with("v-foobar").and_return(volume)
     end
 
     volume.should_receive(:status).and_return(:available)
     volume.should_receive(:destroy).and_return(true)
-    cloud.should_receive(:wait_resource).with(volume, :available, :deleted)
+    cloud.should_receive(:wait_resource).with(volume, :deleted, :status, true)
 
     cloud.delete_disk("v-foobar")
   end
@@ -29,7 +30,8 @@ describe Bosh::OpenStackCloud::Cloud do
 
     expect {
       cloud.delete_disk("v-foobar")
-    }.to raise_error(Bosh::Clouds::CloudError, "Cannot delete volume `v-foobar', state is busy")
+    }.to raise_error(Bosh::Clouds::CloudError,
+                     "Cannot delete volume `v-foobar', state is busy")
   end
 
 end

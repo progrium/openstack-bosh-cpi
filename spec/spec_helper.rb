@@ -111,7 +111,12 @@ def mock_glance(options = nil)
 end
 
 def dynamic_network_spec
-  { "type" => "dynamic" }
+  {
+    "type" => "dynamic",
+    "cloud_properties" => {
+      "security_groups" => %w[default]
+    }
+  }
 end
 
 def vip_network_spec

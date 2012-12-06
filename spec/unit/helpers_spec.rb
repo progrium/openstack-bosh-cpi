@@ -3,6 +3,10 @@
 require File.expand_path("../../spec_helper", __FILE__)
 
 describe Bosh::OpenStackCloud::Helpers do
+  before(:each) do
+    Bosh::Clouds::Config.stub(:task_checkpoint)
+  end
+
   it "should time out" do
     cloud = mock_cloud
 
@@ -12,9 +16,9 @@ describe Bosh::OpenStackCloud::Helpers do
     resource.stub(:status).and_return(:start)
     cloud.stub(:sleep)
 
-    lambda {
-      cloud.wait_resource(resource, :start, :stop, :status, 0.1)
-    }.should raise_error Bosh::Clouds::CloudError, /Timed out/
+    expect {
+      cloud.wait_resource(resource, :stop, :status, false, 0.1)
+    }.to raise_error Bosh::Clouds::CloudError, /Timed out/
   end
 
   it "should not time out" do
@@ -26,9 +30,45 @@ describe Bosh::OpenStackCloud::Helpers do
     resource.stub(:status).and_return(:start, :stop)
     cloud.stub(:sleep)
 
-    lambda {
-      cloud.wait_resource(resource, :start, :stop, :status, 0.1)
-    }.should_not raise_error Bosh::Clouds::CloudError
+    cloud.wait_resource(resource, :stop, :status, false, 0.1)
   end
 
+  it "should raise Bosh::Clouds::CloudError if state is error" do
+    cloud = mock_cloud
+
+    resource = double("resource")
+    resource.stub(:id).and_return("foobar")
+    resource.stub(:reload).and_return(cloud)
+    resource.stub(:status).and_return(:error)
+    cloud.stub(:sleep)
+
+    expect {
+      cloud.wait_resource(resource, :stop, :status, false, 0.1)
+    }.to raise_error Bosh::Clouds::CloudError, /state is error/
+  end
+
+  it "should raise Bosh::Clouds::CloudError if resource not found" do
+    cloud = mock_cloud
+
+    resource = double("resource")
+    resource.stub(:id).and_return("foobar")
+    resource.stub(:reload).and_return(nil)
+    cloud.stub(:sleep)
+
+    expect {
+      cloud.wait_resource(resource, :deleted, :status, false, 0.1)
+    }.to raise_error Bosh::Clouds::CloudError, /Resource not found/
+  end
+
+  it "should not raise and exception if resource not found" do
+    cloud = mock_cloud
+
+    resource = double("resource")
+    resource.stub(:id).and_return("foobar")
+    resource.stub(:reload).and_return(nil)
+    resource.stub(:status).and_return(:deleted)
+    cloud.stub(:sleep)
+
+    cloud.wait_resource(resource, :deleted, :status, true, 0.1)
+  end
 end

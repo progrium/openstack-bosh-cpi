@@ -4,7 +4,7 @@ require File.expand_path("../../spec_helper", __FILE__)
 
 describe Bosh::OpenStackCloud::Cloud do
 
-  it "deregisters OpenStack image with no kernel nor ramdisk associated" do
+  it "deletes stemcell (only image)" do
     image = double("image", :id => "i-foo", :name => "i-foo",
                    :properties => {})
 
@@ -17,11 +17,14 @@ describe Bosh::OpenStackCloud::Cloud do
     cloud.delete_stemcell("i-foo")
   end
 
-  it "deregisters OpenStack image, kernel and ramdisk" do
+  it "deletes stemcell (image, kernel and ramdisk)" do
     image = double("image", :id => "i-foo", :name => "i-foo",
-                   :properties => {"kernel_id" => "k-id", "ramdisk_id" => "r-id"})
-    kernel = double("image", :id => "k-id", :properties => {"stemcell" => "i-foo"})
-    ramdisk = double("image", :id => "r-id", :properties => {"stemcell" => "i-foo"})
+                   :properties => {"kernel_id" => "k-id",
+                                   "ramdisk_id" => "r-id"})
+    kernel = double("image", :id => "k-id",
+                    :properties => {"stemcell" => "i-foo"})
+    ramdisk = double("image", :id => "r-id",
+                     :properties => {"stemcell" => "i-foo"})
 
     cloud = mock_glance do |glance|
       glance.images.stub(:find_by_id).with("i-foo").and_return(image)
@@ -36,9 +39,10 @@ describe Bosh::OpenStackCloud::Cloud do
     cloud.delete_stemcell("i-foo")
   end
 
-  it "deregisters OpenStack image with kernel and ramdisk not uploaded by the CPI" do
+  it "deletes stemcell (kernel and ramdisk not uploaded by the CPI)" do
     image = double("image", :id => "i-foo", :name => "i-foo",
-                   :properties => {"kernel_id" => "k-id", "ramdisk_id" => "r-id"})
+                   :properties => {"kernel_id" => "k-id",
+                                   "ramdisk_id" => "r-id"})
     kernel = double("image", :id => "k-id", :properties => {})
     ramdisk = double("image", :id => "r-id", :properties => {})
 
@@ -53,11 +57,14 @@ describe Bosh::OpenStackCloud::Cloud do
     cloud.delete_stemcell("i-foo")
   end
 
-  it "deregisters OpenStack image with kernel and ramdisk that belongs to other stemcell" do
+  it "deletes stemcell (kernel and ramdisk that do not belong to stemcell)" do
     image = double("image", :id => "i-foo", :name => "i-foo",
-                   :properties => {"kernel_id" => "k-id", "ramdisk_id" => "r-id"})
-    kernel = double("image", :id => "k-id", :properties => {"stemcell" => "i-bar"})
-    ramdisk = double("image", :id => "r-id", :properties => {"stemcell" => "i-bar"})
+                   :properties => {"kernel_id" => "k-id",
+                                   "ramdisk_id" => "r-id"})
+    kernel = double("image", :id => "k-id",
+                    :properties => {"stemcell" => "i-bar"})
+    ramdisk = double("image", :id => "r-id",
+                     :properties => {"stemcell" => "i-bar"})
 
     cloud = mock_glance do |glance|
       glance.images.stub(:find_by_id).with("i-foo").and_return(image)

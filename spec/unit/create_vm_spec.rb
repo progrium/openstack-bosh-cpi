@@ -26,7 +26,7 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
 
   def openstack_params(unique_name, user_data, security_groups=[])
     {
-      :name=>"vm-#{unique_name}",
+      :name => "vm-#{unique_name}",
       :image_ref => "sc-id",
       :flavor_ref => "f-test",
       :key_name => "test_key",
@@ -53,10 +53,13 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
     server = double("server", :id => "i-test", :name => "i-test")
     image = double("image", :id => "sc-id", :name => "sc-id")
     flavor = double("flavor", :id => "f-test", :name => "m1.tiny")
-    address = double("address", :id => "a-test", :ip => "10.0.0.1", :instance_id => "i-test")
+    address = double("address", :id => "a-test", :ip => "10.0.0.1",
+                     :instance_id => "i-test")
 
     cloud = mock_cloud do |openstack|
-      openstack.servers.should_receive(:create).with(openstack_params(unique_name, user_data)).and_return(server)
+      openstack.servers.should_receive(:create).
+          with(openstack_params(unique_name, user_data, %w[default])).
+          and_return(server)
       openstack.images.should_receive(:find).and_return(image)
       openstack.flavors.should_receive(:find).and_return(flavor)
       openstack.addresses.should_receive(:each).and_yield(address)
@@ -64,10 +67,10 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
 
     cloud.should_receive(:generate_unique_name).and_return(unique_name)
     address.should_receive(:server=).with(nil)
-    server.should_receive(:state).and_return(:build)
-    cloud.should_receive(:wait_resource).with(server, :build, :active, :state)
+    cloud.should_receive(:wait_resource).with(server, :active, :state)
 
-    @registry.should_receive(:update_settings).with("i-test", agent_settings(unique_name))
+    @registry.should_receive(:update_settings).
+        with("i-test", agent_settings(unique_name))
 
     vm_id = cloud.create_vm("agent-id", "sc-id",
                             resource_pool_spec,
@@ -86,26 +89,29 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
         "name" => "vm-#{unique_name}"
       }
     }
-    security_groups = %w[foo bar]
+    security_groups = %w[bar foo]
     network_spec = dynamic_network_spec
     network_spec["cloud_properties"] = { "security_groups" => security_groups }
     server = double("server", :id => "i-test", :name => "i-test")
     image = double("image", :id => "sc-id", :name => "sc-id")
     flavor = double("flavor", :id => "f-test", :name => "m1.tiny")
-    address = double("address", :id => "a-test", :ip => "10.0.0.1", :instance_id => nil)
+    address = double("address", :id => "a-test", :ip => "10.0.0.1",
+                     :instance_id => nil)
 
     cloud = mock_cloud do |openstack|
-      openstack.servers.should_receive(:create).with(openstack_params(unique_name, user_data, security_groups)).and_return(server)
+      openstack.servers.should_receive(:create).
+          with(openstack_params(unique_name, user_data, security_groups)).
+          and_return(server)
       openstack.images.should_receive(:find).and_return(image)
       openstack.flavors.should_receive(:find).and_return(flavor)
       openstack.addresses.should_receive(:each).and_yield(address)
     end
 
     cloud.should_receive(:generate_unique_name).and_return(unique_name)
-    server.should_receive(:state).and_return(:build)
-    cloud.should_receive(:wait_resource).with(server, :build, :active, :state)
+    cloud.should_receive(:wait_resource).with(server, :active, :state)
 
-    @registry.should_receive(:update_settings).with("i-test", agent_settings(unique_name, network_spec))
+    @registry.should_receive(:update_settings).
+        with("i-test", agent_settings(unique_name, network_spec))
 
     vm_id = cloud.create_vm("agent-id", "sc-id",
                             resource_pool_spec,
@@ -118,25 +124,83 @@ describe Bosh::OpenStackCloud::Cloud, "create_vm" do
     server = double("server", :id => "i-test", :name => "i-test")
     image = double("image", :id => "sc-id", :name => "sc-id")
     flavor = double("flavor", :id => "f-test", :name => "m1.tiny")
-    address = double("address", :id => "a-test", :ip => "10.0.0.1", :instance_id => "i-test")
+    address = double("address", :id => "a-test", :ip => "10.0.0.1",
+                     :instance_id => "i-test")
 
     cloud = mock_cloud do |openstack|
       openstack.servers.should_receive(:create).and_return(server)
       openstack.images.should_receive(:find).and_return(image)
       openstack.flavors.should_receive(:find).and_return(flavor)
-      openstack.addresses.should_receive(:each).and_yield(address)
+      openstack.addresses.should_receive(:find).and_return(address)
     end
 
     address.should_receive(:server=).with(nil)
     address.should_receive(:server=).with(server)
-    server.should_receive(:state).and_return(:build)
-    cloud.should_receive(:wait_resource).with(server, :build, :active, :state)
+    cloud.should_receive(:wait_resource).with(server, :active, :state)
 
     @registry.should_receive(:update_settings)
 
     vm_id = cloud.create_vm("agent-id", "sc-id",
                             resource_pool_spec,
                             combined_network_spec)
+  end
+
+  def volume(zone)
+    vol = double("volume")
+    vol.stub(:availability_zone).and_return(zone)
+    vol
+  end
+
+  describe "#select_availability_zone" do
+    it "should return nil when all values are nil" do
+      cloud = mock_cloud
+      cloud.select_availability_zone(nil, nil).should == nil
+    end
+
+    it "should select the resource pool availability_zone when disks are nil" do
+      cloud = mock_cloud
+      cloud.select_availability_zone(nil, "foobar-1a").should == "foobar-1a"
+    end
+
+    it "should select the zone from a list of disks" do
+      cloud = mock_cloud do |openstack|
+        openstack.volumes.stub(:get).and_return(volume("foo"), volume("foo"))
+      end
+      cloud.select_availability_zone(%w[cid1 cid2], nil).should == "foo"
+    end
+
+    it "should select the zone from a list of disks and a default" do
+      cloud = mock_cloud do |openstack|
+        openstack.volumes.stub(:get).and_return(volume("foo"), volume("foo"))
+      end
+      cloud.select_availability_zone(%w[cid1 cid2], "foo").should == "foo"
+    end
+  end
+
+  describe "#ensure_same_availability_zone" do
+    it "should raise an error when the zones differ" do
+      cloud = mock_cloud
+      expect {
+        cloud.ensure_same_availability_zone([volume("foo"), volume("bar")],
+                                            nil)
+      }.to raise_error Bosh::Clouds::CloudError
+    end
+
+    it "should raise an error when the zones differ" do
+      cloud = mock_cloud
+      expect {
+        cloud.ensure_same_availability_zone([volume("foo"), volume("bar")],
+                                            "foo")
+      }.to raise_error Bosh::Clouds::CloudError
+    end
+
+    it "should raise an error when the zones differ" do
+      cloud = mock_cloud
+      expect {
+        cloud.ensure_same_availability_zone([volume("foo"), volume("foo")],
+                                            "bar")
+      }.to raise_error Bosh::Clouds::CloudError
+    end
   end
 
 end

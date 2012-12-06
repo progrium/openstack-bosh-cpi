@@ -1,22 +1,23 @@
 # Copyright (c) 2012 Piston Cloud Computing, Inc.
 
 module Bosh::OpenStackCloud
-
+  ##
+  # BOSH OpenStack CPI
   class Cloud < Bosh::Cloud
     include Helpers
-
-    DEFAULT_AVAILABILITY_ZONE = "nova"
-    DEVICE_POLL_TIMEOUT = 60 # seconds
-    METADATA_TIMEOUT = 5 # seconds
 
     attr_reader :openstack
     attr_reader :registry
     attr_reader :glance
+    attr_accessor :logger
 
     ##
-    # Initialize BOSH OpenStack CPI
-    # @param [Hash] options CPI options
+    # Creates a new BOSH OpenStack CPI
     #
+    # @param [Hash] options CPI options
+    # @option options [Hash] openstack OpenStack specific options
+    # @option options [Hash] agent agent options
+    # @option options [Hash] registry agent options
     def initialize(options)
       @options = options.dup
 
@@ -36,10 +37,19 @@ module Bosh::OpenStackCloud
         :openstack_auth_url => @openstack_properties["auth_url"],
         :openstack_username => @openstack_properties["username"],
         :openstack_api_key => @openstack_properties["api_key"],
-        :openstack_tenant => @openstack_properties["tenant"]
+        :openstack_tenant => @openstack_properties["tenant"],
+        :openstack_region => @openstack_properties["region"]
       }
       @openstack = Fog::Compute.new(openstack_params)
-      @glance = Fog::Image.new(openstack_params)
+
+      glance_params = {
+        :provider => "OpenStack",
+        :openstack_auth_url => @openstack_properties["auth_url"],
+        :openstack_username => @openstack_properties["username"],
+        :openstack_api_key => @openstack_properties["api_key"],
+        :openstack_tenant => @openstack_properties["tenant"]
+      }
+      @glance = Fog::Image.new(glance_params)
 
       registry_endpoint = @registry_properties["endpoint"]
       registry_user = @registry_properties["user"]
@@ -52,33 +62,46 @@ module Bosh::OpenStackCloud
     end
 
     ##
-    # Creates a new OpenStack Image using stemcell image.
-    # @param [String] image_path local filesystem path to a stemcell image
+    # Creates a new OpenStack Image using stemcell image. It requires access
+    # to the OpenStack Glance service.
+    #
+    # @param [String] image_path Local filesystem path to a stemcell image
     # @param [Hash] cloud_properties CPI-specific properties
+    # @option cloud_properties [String] name Stemcell name
+    # @option cloud_properties [String] version Stemcell version
+    # @option cloud_properties [String] infrastructure Stemcell infraestructure
+    # @option cloud_properties [String] disk_format Image disk format
+    # @option cloud_properties [String] container_format Image container format
+    # @option cloud_properties [optional, String] kernel_id UUID of the kernel
+    #   image stored at OpenStack
+    # @option cloud_properties [optional, String] kernel_file Name of the
+    #   kernel image file provided at the stemcell archive
+    # @option cloud_properties [optional, String] ramdisk_id UUID of the
+    #   ramdisk image stored at OpenStack
+    # @option cloud_properties [optional, String] ramdisk_file Name of the
+    #   ramdisk image file provided at the stemcell archive
+    # @return [String] OpenStack image UUID of the stemcell
     def create_stemcell(image_path, cloud_properties)
       with_thread_name("create_stemcell(#{image_path}...)") do
         begin
           Dir.mktmpdir do |tmp_dir|
-            @logger.info("Extracting stemcell to `#{tmp_dir}'")
-            if cloud_properties["name"] && cloud_properties["version"]
-              image_name = cloud_properties["name"] + "-" +
-                           cloud_properties["version"]
-            else
-              image_name = "BOSH-#{generate_unique_name}"
-            end
+            @logger.info("Extracting stemcell to `#{tmp_dir}'...")
+            image_name = "BOSH-#{generate_unique_name}"
 
             # 1. Unpack image to temp directory
             unpack_image(tmp_dir, image_path)
             root_image = File.join(tmp_dir, "root.img")
 
-            # 2. If image contains a kernel file, upload it
+            # 2. If image contains a kernel file, upload it to glance service
             kernel_id = nil
             if cloud_properties["kernel_id"]
               kernel_id = cloud_properties["kernel_id"]
             elsif cloud_properties["kernel_file"]
               kernel_image = File.join(tmp_dir, cloud_properties["kernel_file"])
               unless File.exists?(kernel_image)
-                cloud_error("Kernel image is missing from stemcell archive")
+                cloud_error("Kernel image " \
+                            "#{cloud_properties['kernel_file']} " \
+                            "is missing from stemcell archive")
               end
               kernel_params = {
                 :name => "#{image_name}-AKI",
@@ -89,17 +112,20 @@ module Bosh::OpenStackCloud
                   :stemcell => image_name
                 }
               }
+              @logger.info("Uploading kernel image...")
               kernel_id = upload_image(kernel_params)
             end
 
-            # 3. If image contains a ramdisk file, upload it
+            # 3. If image contains a ramdisk file, upload it to glance service
             ramdisk_id = nil
             if cloud_properties["ramdisk_id"]
               ramdisk_id = cloud_properties["ramdisk_id"]
             elsif cloud_properties["ramdisk_file"]
               ramdisk_image = File.join(tmp_dir, cloud_properties["ramdisk_file"])
               unless File.exists?(kernel_image)
-                cloud_error("Ramdisk image is missing from stemcell archive")
+                cloud_error("Ramdisk image " \
+                            "#{cloud_properties['ramdisk_file']} " \
+                            "is missing from stemcell archive")
               end
               ramdisk_params = {
                 :name => "#{image_name}-ARI",
@@ -110,6 +136,7 @@ module Bosh::OpenStackCloud
                   :stemcell => image_name
                 }
               }
+              @logger.info("Uploading ramdisk image...")
               ramdisk_id = upload_image(ramdisk_params)
             end
 
@@ -124,8 +151,16 @@ module Bosh::OpenStackCloud
             image_properties = {}
             image_properties[:kernel_id] = kernel_id if kernel_id
             image_properties[:ramdisk_id] = ramdisk_id if ramdisk_id
-            image_params[:properties] = image_properties unless image_properties.empty?
-
+            if cloud_properties["name"]
+              image_properties[:stemcell_name] = cloud_properties["name"]
+            end
+            if cloud_properties["version"]
+              image_properties[:stemcell_version] = cloud_properties["version"]
+            end
+            unless image_properties.empty?
+              image_params[:properties] = image_properties
+            end
+            @logger.info("Uploading image...")
             upload_image(image_params)
           end
         rescue => e
@@ -137,56 +172,72 @@ module Bosh::OpenStackCloud
 
     ##
     # Deletes a stemcell
-    # @param [String] stemcell stemcell id that was once returned by {#create_stemcell}
+    #
+    # @param [String] stemcell_id OpenStack image UUID of the stemcell to be
+    #   deleted
+    # @return [void]
     def delete_stemcell(stemcell_id)
       with_thread_name("delete_stemcell(#{stemcell_id})") do
-        @logger.info("Deleting `#{stemcell_id}' stemcell")
+        @logger.info("Deleting stemcell `#{stemcell_id}'...")
         image = @glance.images.find_by_id(stemcell_id)
-
-        kernel_id = image.properties["kernel_id"]
-        if kernel_id
-          kernel = @glance.images.find_by_id(kernel_id)
-          if kernel.properties["stemcell"]
-            if kernel.properties["stemcell"] == image.name
-              @logger.info("Deleting `#{stemcell_id}' stemcell kernel")
-              kernel.destroy
+        if image
+          kernel_id = image.properties["kernel_id"]
+          if kernel_id
+            kernel = @glance.images.find_by_id(kernel_id)
+            if kernel && kernel.properties["stemcell"]
+              if kernel.properties["stemcell"] == image.name
+                @logger.info("Deleting kernel `#{kernel_id}'...")
+                kernel.destroy
+                @logger.info("Kernel `#{kernel_id}' is now deleted")
+              end
             end
           end
-        end
 
-        ramdisk_id = image.properties["ramdisk_id"]
-        if ramdisk_id
-          ramdisk = @glance.images.find_by_id(ramdisk_id)
-          if ramdisk.properties["stemcell"]
-            if ramdisk.properties["stemcell"] == image.name
-              @logger.info("Deleting `#{stemcell_id}' stemcell ramdisk")
-              ramdisk.destroy
+          ramdisk_id = image.properties["ramdisk_id"]
+          if ramdisk_id
+            ramdisk = @glance.images.find_by_id(ramdisk_id)
+            if ramdisk && ramdisk.properties["stemcell"]
+              if ramdisk.properties["stemcell"] == image.name
+                @logger.info("Deleting ramdisk `#{ramdisk_id}'...")
+                ramdisk.destroy
+                @logger.info("Ramdisk `#{ramdisk_id}' is now deleted")
+              end
             end
           end
-        end
 
-        image.destroy
+          image.destroy
+          @logger.info("Stemcell `#{stemcell_id}' is now deleted")
+        else
+          @logger.info("Stemcell `#{stemcell_id}' not found. Skipping.")
+        end
       end
     end
 
     ##
     # Creates an OpenStack server and waits until it's in running state
-    # @param [String] agent_id Agent id associated with new VM
-    # @param [String] stemcell_id AMI id that will be used to power on new server
-    # @param [Hash] resource_pool Resource pool specification
-    # @param [Hash] network_spec Network specification, if it contains security groups they must be existing
-    # @param [optional, Array] disk_locality List of disks that might be attached to this server in the future,
-    #  can be used as a placement hint (i.e. server will only be created if resource pool availability zone is
-    #  the same as disk availability zone)
+    #
+    # @param [String] agent_id UUID for the agent that will be used later on by
+    #   the director to locate and talk to the agent
+    # @param [String] stemcell_id OpenStack image UUID that will be used to
+    #   power on new server
+    # @param [Hash] resource_pool cloud specific properties describing the
+    #   resources needed for this VM
+    # @param [Hash] networks list of networks and their settings needed for
+    #   this VM
+    # @param [optional, Array] disk_locality List of disks that might be
+    #   attached to this server in the future, can be used as a placement
+    #   hint (i.e. server will only be created if resource pool availability
+    #   zone is the same as disk availability zone)
     # @param [optional, Hash] environment Data to be merged into agent settings
-    # @return [String] created server id
+    # @return [String] OpenStack server UUID
     def create_vm(agent_id, stemcell_id, resource_pool,
                   network_spec = nil, disk_locality = nil, environment = nil)
       with_thread_name("create_vm(#{agent_id}, ...)") do
+        @logger.info("Creating new server...")
         network_configurator = NetworkConfigurator.new(network_spec)
 
         server_name = "vm-#{generate_unique_name}"
-        metadata = {
+        user_data = {
           "registry" => {
             "endpoint" => @registry.endpoint
           },
@@ -195,23 +246,22 @@ module Bosh::OpenStackCloud
           }
         }
 
-        if disk_locality
-          # TODO: use as hint for availability zones
-          @logger.debug("Disk locality is ignored by OpenStack CPI")
-        end
-
-        security_groups = network_configurator.security_groups(@default_security_groups)
-        @logger.debug("using security groups: #{security_groups.join(', ')}")
+        security_groups =
+          network_configurator.security_groups(@default_security_groups)
+        @logger.debug("Using security groups: `#{security_groups.join(', ')}'")
 
         image = @openstack.images.find { |i| i.id == stemcell_id }
         if image.nil?
-          cloud_error("OpenStack CPI: image #{stemcell_id} not found")
+          cloud_error("Image `#{stemcell_id}' not found")
         end
+        @logger.debug("Using image: `#{stemcell_id}'")
 
-        flavor = @openstack.flavors.find { |f| f.name == resource_pool["instance_type"] }
+        flavor = @openstack.flavors.find { |f|
+          f.name == resource_pool["instance_type"] }
         if flavor.nil?
-          cloud_error("OpenStack CPI: flavor #{resource_pool["instance_type"]} not found")
+          cloud_error("Flavor `#{resource_pool["instance_type"]}' not found")
         end
+        @logger.debug("Using flavor: `#{resource_pool["instance_type"]}'")
 
         server_params = {
           :name => server_name,
@@ -219,26 +269,26 @@ module Bosh::OpenStackCloud
           :flavor_ref => flavor.id,
           :key_name => resource_pool["key_name"] || @default_key_name,
           :security_groups => security_groups,
-          :user_data => Yajl::Encoder.encode(metadata)
+          :user_data => Yajl::Encoder.encode(user_data)
         }
 
-        availability_zone = resource_pool["availability_zone"]
+        availability_zone = select_availability_zone(disk_locality,
+                              resource_pool["availability_zone"])
         if availability_zone
           server_params[:availability_zone] = availability_zone
         end
 
-        @logger.info("Creating new server...")
         server = @openstack.servers.create(server_params)
-        state = server.state
 
-        @logger.info("Creating new server `#{server.id}', state is `#{state}'")
-        wait_resource(server, state, :active, :state)
+        @logger.info("Creating new server `#{server.id}'...")
+        wait_resource(server, :active, :state)
 
-        @logger.info("Configuring network for `#{server.id}'")
+        @logger.info("Configuring network for server `#{server.id}'...")
         network_configurator.configure(@openstack, server)
 
-        @logger.info("Updating server settings for `#{server.id}'")
-        settings = initial_agent_settings(server_name, agent_id, network_spec, environment)
+        @logger.info("Updating settings for server `#{server.id}'...")
+        settings = initial_agent_settings(server_name, agent_id, network_spec,
+                                          environment)
         @registry.update_settings(server.name, settings)
 
         server.id.to_s
@@ -247,45 +297,68 @@ module Bosh::OpenStackCloud
 
     ##
     # Terminates an OpenStack server and waits until it reports as terminated
-    # @param [String] server_id Running OpenStack server id
+    #
+    # @param [String] server_id OpenStack server UUID
+    # @return [void]
     def delete_vm(server_id)
       with_thread_name("delete_vm(#{server_id})") do
+        @logger.info("Deleting server `#{server_id}'...")
         server = @openstack.servers.get(server_id)
-        @logger.info("Deleting server `#{server_id}'")
         if server
-          state = server.state
-
-          @logger.info("Deleting server `#{server.id}', state is `#{state}'")
           server.destroy
-          wait_resource(server, state, :terminated, :state)
+          wait_resource(server, :terminated, :state, true)
 
-          @logger.info("Deleting server settings for `#{server.id}'")
+          @logger.info("Deleting settings for server `#{server.id}'...")
           @registry.delete_settings(server.name)
+        else
+          @logger.info("Server `#{server_id}' not found. Skipping.")
         end
       end
     end
 
     ##
     # Reboots an OpenStack Server
-    # @param [String] server_id Running OpenStack server id
+    #
+    # @param [String] server_id OpenStack server UUID
+    # @return [void]
     def reboot_vm(server_id)
       with_thread_name("reboot_vm(#{server_id})") do
         server = @openstack.servers.get(server_id)
+        unless server
+          cloud_error("Server `#{server_id}' not found")
+        end
         soft_reboot(server)
       end
     end
 
     ##
     # Configures networking on existing OpenStack server
-    # @param [String] server_id Running OpenStack server id
-    # @param [Hash] network_spec raw network spec passed by director
+    #
+    # @param [String] server_id OpenStack server UUID
+    # @param [Hash] network_spec Raw network spec passed by director
+    # @return [void]
+    # @raise [Bosh::Clouds:NotSupported] if the security groups change
     def configure_networks(server_id, network_spec)
       with_thread_name("configure_networks(#{server_id}, ...)") do
         @logger.info("Configuring `#{server_id}' to use the following " \
                      "network settings: #{network_spec.pretty_inspect}")
 
-        server = @openstack.servers.get(server_id)
         network_configurator = NetworkConfigurator.new(network_spec)
+        server = @openstack.servers.get(server_id)
+
+        sg = @openstack.list_security_groups(server_id).body["security_groups"]
+        actual = sg.collect { |s| s["name"] }.sort
+        new = network_configurator.security_groups(@default_security_groups)
+
+        # If the security groups change, we need to recreate the VM
+        # as you can't change the security group of a running server,
+        # we need to send the InstanceUpdater a request to do it for us
+        unless actual == new
+          raise Bosh::Clouds::NotSupported,
+                "security groups change requires VM recreation: %s to %s" %
+                [actual.join(", "), new.join(", ")]
+        end
+
         network_configurator.configure(@openstack, server)
 
         update_agent_settings(server) do |settings|
@@ -296,43 +369,43 @@ module Bosh::OpenStackCloud
 
     ##
     # Creates a new OpenStack volume
+    #
     # @param [Integer] size disk size in MiB
-    # @param [optional, String] server_id vm id of the VM that this disk will be attached to
-    # @return [String] created OpenStack volume id
+    # @param [optional, String] server_id OpenStack server UUID of the VM that
+    #   this disk will be attached to
+    # @return [String] OpenStack volume UUID
     def create_disk(size, server_id = nil)
       with_thread_name("create_disk(#{size}, #{server_id})") do
         unless size.kind_of?(Integer)
-          raise ArgumentError, "disk size needs to be an integer"
+          raise ArgumentError, "Disk size needs to be an integer"
         end
 
         if (size < 1024)
-          cloud_error("OpenStack CPI minimum disk size is 1 GiB")
+          cloud_error("Minimum disk size is 1 GiB")
         end
 
         if (size > 1024 * 1000)
-          cloud_error("OpenStack CPI maximum disk size is 1 TiB")
-        end
-
-        if server_id
-          server = @openstack.servers.get(server_id)
-          availability_zone = server.availability_zone
-        else
-          availability_zone = DEFAULT_AVAILABILITY_ZONE
+          cloud_error("Maximum disk size is 1 TiB")
         end
 
         volume_params = {
           :name => "volume-#{generate_unique_name}",
           :description => "",
-          :size => (size / 1024.0).ceil,
-          :availability_zone => availability_zone
+          :size => (size / 1024.0).ceil
         }
+
+        if server_id
+          server = @openstack.servers.get(server_id)
+          if server && server.availability_zone
+            volume_params[:availability_zone] = server.availability_zone
+          end
+        end
 
         @logger.info("Creating new volume...")
         volume = @openstack.volumes.create(volume_params)
-        state = volume.status
 
-        @logger.info("Creating new volume `#{volume.id}', state is `#{state}'")
-        wait_resource(volume, state, :available)
+        @logger.info("Creating new volume `#{volume.id}'...")
+        wait_resource(volume, :available)
 
         volume.id.to_s
       end
@@ -340,28 +413,44 @@ module Bosh::OpenStackCloud
 
     ##
     # Deletes an OpenStack volume
-    # @param [String] disk_id volume id
+    #
+    # @param [String] disk_id OpenStack volume UUID
+    # @return [void]
+    # @raise [Bosh::Clouds::CloudError] if disk is not in available state
     def delete_disk(disk_id)
       with_thread_name("delete_disk(#{disk_id})") do
+        @logger.info("Deleting volume `#{disk_id}'...")
         volume = @openstack.volumes.get(disk_id)
-        state = volume.status
+        if volume
+          state = volume.status
+          if state.to_sym != :available
+            cloud_error("Cannot delete volume `#{disk_id}', state is #{state}")
+          end
 
-        cloud_error("Cannot delete volume `#{disk_id}', state is #{state}") if state.to_sym != :available
-
-        @logger.info("Deleting volume `#{disk_id}', state is `#{state}'")
-        volume.destroy
-        wait_resource(volume, state, :deleted)
+          volume.destroy
+          wait_resource(volume, :deleted, :status, true)
+        else
+          @logger.info("Volume `#{disk_id}' not found. Skipping.")
+        end
       end
     end
 
     ##
     # Attaches an OpenStack volume to an OpenStack server
-    # @param [String] server_id Running OpenStack server id
-    # @param [String] disk_id volume id
+    #
+    # @param [String] server_id OpenStack server UUID
+    # @param [String] disk_id OpenStack volume UUID
+    # @return [void]
     def attach_disk(server_id, disk_id)
       with_thread_name("attach_disk(#{server_id}, #{disk_id})") do
         server = @openstack.servers.get(server_id)
+        unless server
+          cloud_error("Server `#{server_id}' not found")
+        end
         volume = @openstack.volumes.get(disk_id)
+        unless server
+          cloud_error("Volume `#{disk_id}' not found")
+        end
 
         device_name = attach_volume(server, volume)
 
@@ -375,12 +464,20 @@ module Bosh::OpenStackCloud
 
     ##
     # Detaches an OpenStack volume from an OpenStack server
-    # @param [String] server_id Running OpenStack server id
-    # @param [String] disk_id volume id
+    #
+    # @param [String] server_id OpenStack server UUID
+    # @param [String] disk_id OpenStack volume UUID
+    # @return [void]
     def detach_disk(server_id, disk_id)
       with_thread_name("detach_disk(#{server_id}, #{disk_id})") do
         server = @openstack.servers.get(server_id)
+        unless server
+          cloud_error("Server `#{server_id}' not found")
+        end
         volume = @openstack.volumes.get(disk_id)
+        unless server
+          cloud_error("Volume `#{disk_id}' not found")
+        end
 
         detach_volume(server, volume)
 
@@ -394,26 +491,74 @@ module Bosh::OpenStackCloud
 
     ##
     # Validates the deployment
-    # @api not_yet_used
+    #
+    # @note Not implemented in the OpenStack CPI
     def validate_deployment(old_manifest, new_manifest)
       not_implemented(:validate_deployment)
     end
 
+    ##
+    # Selects the availability zone to use from a list of disk volumes,
+    # resource pool availability zone (if any) and the default availability
+    # zone.
+    #
+    # @param [Array] volumes OpenStack volume UUIDs to attach to the vm
+    # @param [String] resource_pool_az availability zone specified in
+    #   the resource pool (may be nil)
+    # @return [String] availability zone to use or nil
+    # @note this is a private method that is public to make it easier to test
+    def select_availability_zone(volumes, resource_pool_az)
+      if volumes && !volumes.empty?
+        disks = volumes.map { |vid| @openstack.volumes.get(vid) }
+        ensure_same_availability_zone(disks, resource_pool_az)
+        disks.first.availability_zone
+      else
+        resource_pool_az
+      end
+    end
+
+    ##
+    # Ensure all supplied availability zones are the same
+    #
+    # @param [Array] disks OpenStack volumes
+    # @param [String] default availability zone specified in
+    #   the resource pool (may be nil)
+    # @return [String] availability zone to use or nil
+    # @note this is a private method that is public to make it easier to test
+    def ensure_same_availability_zone(disks, default)
+      zones = disks.map { |disk| disk.availability_zone }
+      zones << default if default
+      zones.uniq!
+      cloud_error "can't use multiple availability zones: %s" %
+        zones.join(", ") unless zones.size == 1 || zones.empty?
+    end
+
     private
+
+    ##
+    # Generates an unique name
+    #
+    # @return [String] Unique name
+    def generate_unique_name
+      UUIDTools::UUID.random_create.to_s
+    end
 
     ##
     # Generates initial agent settings. These settings will be read by agent
     # from OpenStack registry (also a BOSH component) on a target server. Disk
     # conventions for OpenStack are:
     # system disk: /dev/vda
-    # OpenStack volumes can be configured to map to other device names later (vdc
-    # through vdz, also some kernels will remap vd* to xvd*).
+    # ephemeral disk: /dev/ vdb
+    # OpenStack volumes can be configured to map to other device names later
+    # (vdc through vdz, also some kernels will remap vd* to xvd*).
     #
+    # @param [String] server_name Name of the OpenStack server (will be picked
+    #   up by agent to fetch registry settings)
     # @param [String] agent_id Agent id (will be picked up by agent to
     #   assume its identity
     # @param [Hash] network_spec Agent network spec
-    # @param [Hash] environment
-    # @return [Hash]
+    # @param [Hash] environment Environment settings
+    # @return [Hash] Agent settings
     def initial_agent_settings(server_name, agent_id, network_spec, environment)
       settings = {
         "vm" => {
@@ -432,63 +577,65 @@ module Bosh::OpenStackCloud
       settings.merge(@agent_properties)
     end
 
+    ##
+    # Updates the agent settings
+    #
+    # @param [Fog::Compute::OpenStack::Server] server OpenStack server
     def update_agent_settings(server)
       unless block_given?
-        raise ArgumentError, "block is not provided"
+        raise ArgumentError, "Block is not provided"
       end
 
-      # TODO uncomment to test registry
-      @logger.info("Updating server settings for `#{server.id}'")
+      @logger.info("Updating settings for server `#{server.id}'...")
       settings = @registry.read_settings(server.name)
       yield settings
       @registry.update_settings(server.name, settings)
     end
 
-    def generate_unique_name
-      UUIDTools::UUID.random_create.to_s
-    end
-
     ##
     # Soft reboots an OpenStack server
+    #
     # @param [Fog::Compute::OpenStack::Server] server OpenStack server
+    # @return [void]
     def soft_reboot(server)
-      state = server.state
-
-      @logger.info("Soft rebooting server `#{server.id}', state is `#{state}'")
+      @logger.info("Soft rebooting server `#{server.id}'...")
       server.reboot
-      wait_resource(server, state, :active, :state)
+      wait_resource(server, :active, :state)
     end
 
     ##
     # Hard reboots an OpenStack server
+    #
     # @param [Fog::Compute::OpenStack::Server] server OpenStack server
+    # @return [void]
     def hard_reboot(server)
-      state = server.state
-
-      @logger.info("Hard rebooting server `#{server.id}', state is `#{state}'")
+      @logger.info("Hard rebooting server `#{server.id}'...")
       server.reboot(type = 'HARD')
-      wait_resource(server, state, :active, :state)
+      wait_resource(server, :active, :state)
     end
 
     ##
     # Attaches an OpenStack volume to an OpenStack server
+    #
     # @param [Fog::Compute::OpenStack::Server] server OpenStack server
     # @param [Fog::Compute::OpenStack::Volume] volume OpenStack volume
+    # @return [String] Device name
     def attach_volume(server, volume)
-      volume_attachments = @openstack.get_server_volumes(server.id).body['volumeAttachments']
-      device_names = Set.new(volume_attachments.collect! {|v| v["device"] })
-      new_attachment = nil
+      volume_attachments = @openstack.get_server_volumes(server.id).
+                           body['volumeAttachments']
+      device_names = Set.new(volume_attachments.collect! { |v| v["device"] })
 
+      new_attachment = nil
       ("c".."z").each do |char|
         dev_name = "/dev/vd#{char}"
         if device_names.include?(dev_name)
           @logger.warn("`#{dev_name}' on `#{server.id}' is taken")
           next
         end
-        @logger.info("Attaching volume `#{volume.id}' to `#{server.id}', device name is `#{dev_name}'")
+        @logger.info("Attaching volume `#{volume.id}' to `#{server.id}', " \
+                     "device name is `#{dev_name}'")
         if volume.attach(server.id, dev_name)
-          state = volume.status
-          wait_resource(volume, state, :"in-use")
+          wait_resource(volume, :"in-use")
           new_attachment = dev_name
         end
         break
@@ -503,89 +650,46 @@ module Bosh::OpenStackCloud
 
     ##
     # Detaches an OpenStack volume from an OpenStack server
+    #
     # @param [Fog::Compute::OpenStack::Server] server OpenStack server
     # @param [Fog::Compute::OpenStack::Volume] volume OpenStack volume
+    # @return [void]
     def detach_volume(server, volume)
-      volume_attachments = @openstack.get_server_volumes(server.id).body['volumeAttachments']
-      device_map = volume_attachments.collect! {|v| v["volumeId"] }
+      volume_attachments = @openstack.get_server_volumes(server.id).
+                           body['volumeAttachments']
+      device_map = volume_attachments.collect! { |v| v["volumeId"] }
 
-      if !device_map.include?(volume.id)
-        cloud_error("Disk `#{volume.id}' is not attached to server `#{server.id}'")
+      unless device_map.include?(volume.id)
+        cloud_error("Disk `#{volume.id}' is not attached to " \
+                    "server `#{server.id}'")
       end
 
-      state = volume.status
-      @logger.info("Detaching volume `#{volume.id}' from `#{server.id}', state is `#{state}'")
+      @logger.info("Detaching volume `#{volume.id}' from `#{server.id}'...")
       volume.detach(server.id, volume.id)
-      wait_resource(volume, state, :available)
+      wait_resource(volume, :available)
     end
 
     ##
     # Uploads a new image to OpenStack via Glance
+    #
     # @param [Hash] image_params Image params
+    # @return [String] OpenStack image UUID
     def upload_image(image_params)
       @logger.info("Creating new image...")
+      started_at = Time.now
       image = @glance.images.create(image_params)
-      state = image.status
-
-      @logger.info("Creating new image `#{image.id}', state is `#{state}'")
-      wait_resource(image, state, :active)
+      total = Time.now - started_at
+      @logger.info("Created new image `#{image.id}', took #{total}s")
 
       image.id.to_s
     end
 
     ##
-    # Reads current server id from OpenStack metadata. We are assuming
-    # server id cannot change while current process is running
-    # and thus memoizing it.
-    def current_server_id
-      @metadata_lock.synchronize do
-        return @current_server_id if @current_server_id
-
-        client = HTTPClient.new
-        client.connect_timeout = METADATA_TIMEOUT
-        # Using 169.254.169.254 is an OpenStack convention for getting
-        # server metadata
-        uri = "http://169.254.169.254/latest/user-data"
-
-        headers = {"Accept" => "application/json"}
-        response = client.get(uri, {}, headers)
-        unless response.status == 200
-          cloud_error("Server metadata endpoint returned HTTP #{response.status}")
-        end
-
-        user_data = Yajl::Parser.parse(response.body)
-        unless user_data.is_a?(Hash)
-          cloud_error("Invalid response from #{uri} , Hash expected, " \
-                      "got #{response.body.class}: #{response.body}")
-        end
-
-        unless user_data.has_key?("server") &&
-               user_data["server"].has_key?("name")
-          cloud_error("Cannot parse user data for endpoint #{user_data.inspect}")
-        end
-        @current_server_id = user_data["server"]["name"]
-      end
-
-    rescue HTTPClient::TimeoutError
-      cloud_error("Timed out reading server metadata, " \
-                  "please make sure CPI is running on an OpenStack server")
-    end
-
-    def find_device(vd_name)
-      xvd_name = vd_name.gsub(/^\/dev\/vd/, "/dev/xvd")
-
-      DEVICE_POLL_TIMEOUT.times do
-        if File.blockdev?(vd_name)
-          return vd_name
-        elsif File.blockdev?(xvd_name)
-          return xvd_name
-        end
-        sleep(1)
-      end
-
-      cloud_error("Cannot find OpenStack volume on current server")
-    end
-
+    # Unpacks a stemcell archive
+    #
+    # @param [String] tmp_dir Temporary directory
+    # @param [String] image_path Local filesystem path to a stemcell image
+    # @return [void]
     def unpack_image(tmp_dir, image_path)
       output = `tar -C #{tmp_dir} -xzf #{image_path} 2>&1`
       if $?.exitstatus != 0
@@ -603,6 +707,8 @@ module Bosh::OpenStackCloud
     # Checks if options passed to CPI are valid and can actually
     # be used to create all required data structures etc.
     #
+    # @return [void]
+    # @raise [ArgumentError] if options are not valid
     def validate_options
       unless @options.has_key?("openstack") &&
           @options["openstack"].is_a?(Hash) &&
@@ -622,6 +728,9 @@ module Bosh::OpenStackCloud
       end
     end
 
-  end
+    def task_checkpoint
+      Bosh::Clouds::Config.task_checkpoint
+    end
 
+  end
 end
