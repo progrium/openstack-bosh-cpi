@@ -14,6 +14,18 @@ begin
 rescue LoadError
 end
 
+begin
+  require "bundler_task"
+rescue LoadError
+  bundlertask_notloaded = true
+end
+
+begin
+  require "ci_task"
+rescue LoadError
+  citasktask_notloaded = true
+end
+
 gem_helper = Bundler::GemHelper.new(Dir.pwd)
 
 desc "Build CPI gem into the pkg directory"
@@ -27,12 +39,22 @@ task "install" do
   gem_helper.install_gem
 end
 
+unless bundlertask_notloaded
+  BundlerTask.new
+end
+
 if defined?(RSpec)
   namespace :spec do
     desc "Run Unit Tests"
     rspec_task = RSpec::Core::RakeTask.new(:unit) do |t|
       t.pattern = "spec/unit/**/*_spec.rb"
       t.rspec_opts = %w(--format progress --colour)
+    end
+
+    unless citasktask_notloaded
+      CiTask.new do |task|
+        task.rspec_task = rspec_task
+      end
     end
   end
 
