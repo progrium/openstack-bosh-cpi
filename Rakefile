@@ -17,13 +17,11 @@ end
 begin
   require "bundler_task"
 rescue LoadError
-  bundlertask_notloaded = true
 end
 
 begin
   require "ci_task"
 rescue LoadError
-  citasktask_notloaded = true
 end
 
 gem_helper = Bundler::GemHelper.new(Dir.pwd)
@@ -33,14 +31,14 @@ task "build" do
   gem_helper.build_gem
 end
 
-desc "Build and install CPI into system gems"
-task "install" do
-  Rake::Task["bundler:install"].invoke
-  gem_helper.install_gem
-end
-
-unless bundlertask_notloaded
+if defined?(BundlerTask)
   BundlerTask.new
+
+  desc "Build and install CPI into system gems"
+  task "install" do
+    Rake::Task["bundler:install"].invoke
+    gem_helper.install_gem
+  end
 end
 
 if defined?(RSpec)
@@ -51,7 +49,7 @@ if defined?(RSpec)
       t.rspec_opts = %w(--format progress --colour)
     end
 
-    unless citasktask_notloaded
+    if defined?(CiTask)
       CiTask.new do |task|
         task.rspec_task = rspec_task
       end
