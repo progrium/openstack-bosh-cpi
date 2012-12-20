@@ -710,8 +710,8 @@ module Bosh::OpenStackCloud
     # @return [void]
     # @raise [ArgumentError] if options are not valid
     def validate_options
-      unless @options.has_key?("openstack") &&
-          @options["openstack"].is_a?(Hash) &&
+      unless @options["openstack"].is_a?(Hash) &&
+          @options.has_key?("openstack") &&
           @options["openstack"]["auth_url"] &&
           @options["openstack"]["username"] &&
           @options["openstack"]["api_key"] &&
