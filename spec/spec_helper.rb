@@ -9,6 +9,9 @@ Bundler.setup(:default, :test)
 
 require "rspec"
 require "tmpdir"
+require 'zlib'
+require 'archive/tar/minitar'
+include Archive::Tar
 
 require "cloud/openstack"
 
