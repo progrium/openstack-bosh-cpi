@@ -196,6 +196,120 @@ describe Bosh::OpenStackCloud::Cloud do
       sc_id.should == "i-bar"
     end
 
-  end
+    it "should throw an error for non existent root image in stemcell archive" do
+      begin 
+        dir = Dir.mkdir("tmp")
+        Dir.chdir 'tmp'    
+   
+        kernel_img = File.new('kernel.img', 'w')
+        ramdisk_img = File.new('initrd.img', 'w')
 
+        tgz = Zlib::GzipWriter.new(File.open('stemcell.tgz', 'wb'))
+        array = ['kernel.img']
+    
+        Minitar.pack(array, tgz)
+      
+        cloud = mock_glance
+        error_expected = "Root image is missing from stemcell archive"
+        error_actual = ""
+        begin
+          cloud.create_stemcell("./stemcell.tgz", {
+            "name" => "bosh-stemcell",
+            "version" => "x.y.z",
+            "container_format" => "ami",
+            "disk_format" => "ami",
+            "kernel_file" => "kernel.img",
+            "ramdisk_file" => "initrd.img"
+          })
+        rescue Bosh::Clouds::CloudError => e
+          error_actual  = e.to_s
+        end
+        error_actual.should eq(error_expected)
+      ensure
+        File.delete('kernel.img')
+        File.delete('initrd.img')
+        File.delete('stemcell.tgz')
+        Dir.chdir '..'
+        Dir.delete('tmp')
+      end
+    end
+
+    it "should throw an error for non existent kernel image in stemcell archive" do
+      begin 
+        dir = Dir.mkdir("tmp")
+        Dir.chdir 'tmp'    
+        root_img = File.new('root.img','w') 
+        if root_img
+          root_img.syswrite("ABCDEF")
+        end
+        ramdisk_img = File.new('initrd.img', 'w')
+
+        tgz = Zlib::GzipWriter.new(File.open('stemcell.tgz', 'wb'))
+        array = ['root.img']
+    
+        Minitar.pack(array, tgz)
+      
+        cloud = mock_glance
+        error_expected = "Kernel image kernel.img is missing from stemcell archive"
+        error_actual = ""
+        begin
+          cloud.create_stemcell("./stemcell.tgz", {
+            "name" => "bosh-stemcell",
+            "version" => "x.y.z",
+            "container_format" => "ami",
+            "disk_format" => "ami",
+            "kernel_file" => "kernel.img",
+            "ramdisk_file" => "initrd.img"
+          })
+        rescue Bosh::Clouds::CloudError => e
+          error_actual  = e.to_s
+        end
+        error_actual.should eq(error_expected)
+      ensure
+        File.delete('root.img')
+        File.delete('initrd.img')
+        File.delete('stemcell.tgz')
+        Dir.chdir '..'
+        Dir.delete('tmp')
+      end
+    end
+
+    it "should throw an error for non existent ramdisk image in stemcell archive" do
+      begin 
+        dir = Dir.mkdir("tmp")
+        Dir.chdir 'tmp'    
+        root_img = File.new('root.img','w') 
+        if root_img
+          root_img.syswrite("ABCDEF")
+        end
+
+        tgz = Zlib::GzipWriter.new(File.open('stemcell.tgz', 'wb'))
+        array = ['root.img']
+    
+        Minitar.pack(array, tgz)
+      
+        cloud = mock_glance
+        error_expected = "Ramdisk image initrd.img is missing from stemcell archive"
+        error_actual = ""
+        begin
+          cloud.create_stemcell("./stemcell.tgz", {
+            "name" => "bosh-stemcell",
+            "version" => "x.y.z",
+            "container_format" => "ami",
+            "disk_format" => "ami",
+            #"kernel_file" => "kernel.img",
+            "ramdisk_file" => "initrd.img"
+          })
+        rescue Bosh::Clouds::CloudError => e
+          error_actual  = e.to_s
+        end
+        error_actual.should eq(error_expected)
+      ensure
+        File.delete('root.img')
+        File.delete('stemcell.tgz')
+        Dir.chdir '..'
+        Dir.delete('tmp')
+      end
+    end
+  end
 end

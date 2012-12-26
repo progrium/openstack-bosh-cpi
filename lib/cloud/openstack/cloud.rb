@@ -91,7 +91,7 @@ module Bosh::OpenStackCloud
             # 1. Unpack image to temp directory
             unpack_image(tmp_dir, image_path)
             root_image = File.join(tmp_dir, "root.img")
-
+        
             # 2. If image contains a kernel file, upload it to glance service
             kernel_id = nil
             if cloud_properties["kernel_id"]
@@ -122,7 +122,7 @@ module Bosh::OpenStackCloud
               ramdisk_id = cloud_properties["ramdisk_id"]
             elsif cloud_properties["ramdisk_file"]
               ramdisk_image = File.join(tmp_dir, cloud_properties["ramdisk_file"])
-              unless File.exists?(kernel_image)
+              unless File.exists?(ramdisk_image)
                 cloud_error("Ramdisk image " \
                             "#{cloud_properties['ramdisk_file']} " \
                             "is missing from stemcell archive")
@@ -696,7 +696,6 @@ module Bosh::OpenStackCloud
         cloud_error("Failed to unpack stemcell root image" \
                     "tar exit status #{$?.exitstatus}: #{output}")
       end
-
       root_image = File.join(tmp_dir, "root.img")
       unless File.exists?(root_image)
         cloud_error("Root image is missing from stemcell archive")
