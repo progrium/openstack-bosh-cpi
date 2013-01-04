@@ -2,7 +2,7 @@
 
 module Bosh::OpenStackCloud
   ##
-  #
+  # Represents OpenStack network.
   class Network
     include Helpers
 

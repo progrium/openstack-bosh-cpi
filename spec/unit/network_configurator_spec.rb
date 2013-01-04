@@ -11,13 +11,13 @@ describe Bosh::OpenStackCloud::NetworkConfigurator do
   end
 
   it "should raise an error if the spec isn't a hash" do
-    lambda {
+    expect {
       Bosh::OpenStackCloud::NetworkConfigurator.new("foo")
-    }.should raise_error ArgumentError
+    }.to raise_error ArgumentError
   end
 
   describe "security groups" do
-    it "should only be extracted from dynamic network" do
+    it "should be extracted from both dynamic and vip network" do
       spec = {}
       spec["network_a"] = dynamic_network_spec
       set_security_groups(spec["network_a"], %w[foo])
@@ -25,12 +25,12 @@ describe Bosh::OpenStackCloud::NetworkConfigurator do
       set_security_groups(spec["network_b"], %w[bar])
 
       nc = Bosh::OpenStackCloud::NetworkConfigurator.new(spec)
-      nc.security_groups(nil).should == %w[foo]
+      nc.security_groups(nil).should == %w[bar foo]
     end
 
     it "should return the default groups if none are extracted" do
       spec = {}
-      spec["network_a"] = dynamic_network_spec
+      spec["network_a"] = {"type" => "dynamic"}
 
       nc = Bosh::OpenStackCloud::NetworkConfigurator.new(spec)
       nc.security_groups(%w[foo]).should == %w[foo]
@@ -38,7 +38,7 @@ describe Bosh::OpenStackCloud::NetworkConfigurator do
 
     it "should return an empty list if no default group is set" do
       spec = {}
-      spec["network_a"] = dynamic_network_spec
+      spec["network_a"] = {"type" => "dynamic"}
 
       nc = Bosh::OpenStackCloud::NetworkConfigurator.new(spec)
       nc.security_groups(nil).should == []
@@ -49,9 +49,9 @@ describe Bosh::OpenStackCloud::NetworkConfigurator do
       spec["network_a"] = dynamic_network_spec
       set_security_groups(spec["network_a"], "foo")
 
-      lambda {
+      expect {
         Bosh::OpenStackCloud::NetworkConfigurator.new(spec)
-      }.should raise_error ArgumentError, "security groups must be an Array"
+      }.to raise_error ArgumentError, "security groups must be an Array"
     end
   end
 end

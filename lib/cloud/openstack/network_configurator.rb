@@ -8,15 +8,13 @@ module Bosh::OpenStackCloud
   # a number of sanity checks for the network spec provided by director
   # to make sure we don't apply something OpenStack doesn't understand how to
   # deal with.
-  #
   class NetworkConfigurator
     include Helpers
 
     ##
     # Creates new network spec
     #
-    # @param [Hash] spec raw network spec passed by director
-    # TODO Add network configuration examples
+    # @param [Hash] spec Raw network spec passed by director
     def initialize(spec)
       unless spec.is_a?(Hash)
         raise ArgumentError, "Invalid spec, Hash expected, " \
@@ -37,20 +35,19 @@ module Bosh::OpenStackCloud
             cloud_error("More than one dynamic network for `#{name}'")
           else
             @dynamic_network = DynamicNetwork.new(name, spec)
-            # only extract security groups for dynamic networks
-            extract_security_groups(spec)
+            @security_groups += extract_security_groups(spec)
           end
         when "vip"
           if @vip_network
             cloud_error("More than one vip network for `#{name}'")
           else
             @vip_network = VipNetwork.new(name, spec)
+            @security_groups += extract_security_groups(spec)
           end
         else
-          cloud_error("Invalid network type `#{network_type}': OpenStack CPI " \
-                      "can only handle `dynamic' and `vip' network types")
+          cloud_error("Invalid network type `#{network_type}': OpenStack " \
+                      "CPI can only handle `dynamic' and `vip' network types")
         end
-
       end
 
       if @dynamic_network.nil?
@@ -58,6 +55,12 @@ module Bosh::OpenStackCloud
       end
     end
 
+    ##
+    # Applies network configuration to the vm
+    #
+    # @param [Fog::Compute::OpenStack] openstack Fog OpenStack Compute client
+    # @param [Fog::Compute::OpenStack::Server] server OpenStack server to
+    #   configure
     def configure(openstack, server)
       @dynamic_network.configure(openstack, server)
 
@@ -81,33 +84,38 @@ module Bosh::OpenStackCloud
     # Returns the security groups for this network configuration, or
     # the default security groups if the configuration does not contain
     # security groups
+    #
     # @param [Array] default Default security groups
     # @return [Array] security groups
     def security_groups(default)
       if @security_groups.empty? && default
-        return default
+        default
       else
-        return @security_groups
+        @security_groups.sort
       end
     end
 
+    private
+
     ##
     # Extracts the security groups from the network configuration
+    #
     # @param [Hash] network_spec Network specification
+    # @return [Array] security groups
     # @raise [ArgumentError] if the security groups in the network_spec
     #   is not an Array
-    def extract_security_groups(spec)
-      if spec && spec["cloud_properties"]
-        cloud_properties = spec["cloud_properties"]
+    def extract_security_groups(network_spec)
+      if network_spec && network_spec["cloud_properties"]
+        cloud_properties = network_spec["cloud_properties"]
         if cloud_properties && cloud_properties["security_groups"]
           unless cloud_properties["security_groups"].is_a?(Array)
             raise ArgumentError, "security groups must be an Array"
           end
-          @security_groups += cloud_properties["security_groups"]
+          return cloud_properties["security_groups"]
         end
       end
+      []
     end
 
   end
-
 end

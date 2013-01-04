@@ -15,9 +15,8 @@ describe Bosh::OpenStackCloud::Cloud do
       openstack.servers.should_receive(:get).with("i-foobar").and_return(server)
     end
 
-    server.should_receive(:state).and_return(:active)
     server.should_receive(:destroy).and_return(true)
-    cloud.should_receive(:wait_resource).with(server, :active, :terminated, :state)
+    cloud.should_receive(:wait_resource).with(server, :terminated, :state, true)
 
     @registry.should_receive(:delete_settings).with("i-foobar")
 

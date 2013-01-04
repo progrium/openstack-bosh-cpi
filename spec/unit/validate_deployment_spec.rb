@@ -10,7 +10,8 @@ describe Bosh::OpenStackCloud::Cloud do
     cloud = make_cloud
     expect {
       cloud.validate_deployment({}, {})
-    }.to raise_error(Bosh::Clouds::NotImplemented, "`validate_deployment' is not implemented by Bosh::OpenStackCloud::Cloud")
+    }.to raise_error(Bosh::Clouds::NotImplemented,
+      "`validate_deployment' is not implemented by Bosh::OpenStackCloud::Cloud")
   end
 
 end

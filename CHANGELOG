@@ -1,11 +1,39 @@
-=== 0.04 - 2012-11-01
+=== 0.0.5 - 2012-12-05
+* Use stemcell version & name when present
+* Store stemcell name & version at image properties
+* Fix 'wait_resource'
+* Fix network configuration
+* Upgrade bosh_cpi to v0.5.1
+* Allow CPI tasks to be cancelled
+* Upgrade rspec & guard gems
+* Updated CPI documentation
+* Fix availability zones in create vm and create disk
+* Added info messages when uploading kernel and ramdisk images
+* Added support for OpenStack regions
+* Use separate glance parms
+* Add logger accessor
+* Fix 'wait_resource' not returning symbols
+* Fix 'wait_resource' when resource is not found
+* Fix delete settings from registry
+* Handle resources not found
+* Handle server not found when rebooting
+* Added basic integration tests for VM lifecycle
+* Added single quotes to resource names
+* Log stemcell_id and instance_type when creating a new vm
+* Log time taken to create images
+* Cosmetic changes for log messages at create_vm
+* Add configure_network test to VM integration tests
+* Comestic changes: wrap code at 80 columns
+* Change how args are passed to httpclient
+
+=== 0.0.4 - 2012-11-01
 * Use "latest" metadata endpoint
 * security groups are already put into hashes at this point, so without…
 * empty map returns an enumerator, but it should just be the array
 * Upgrade bosh_common and fog gems
 * Fix create_vm with security groups unit test
 
-=== 0.03 - 2012-08-15
+=== 0.0.3 - 2012-08-15
 * Add Authors file
 * Fix image look-up
 * Fix Floating IP association

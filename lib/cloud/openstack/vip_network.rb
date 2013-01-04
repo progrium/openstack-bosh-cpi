@@ -2,7 +2,8 @@
 
 module Bosh::OpenStackCloud
   ##
-  #
+  # Represents OpenStack vip network: where users sets VM's IP (floating IP's
+  # in OpenStack)
   class VipNetwork < Network
 
     ##
@@ -15,33 +16,31 @@ module Bosh::OpenStackCloud
     end
 
     ##
-    # Configures vip network
+    # Configures OpenStack vip network
     #
     # @param [Fog::Compute::OpenStack] openstack Fog OpenStack Compute client
-    # @param [Fog::Compute::OpenStack::Server] server OpenStack server to configure
+    # @param [Fog::Compute::OpenStack::Server] server OpenStack server to
+    #   configure
     def configure(openstack, server)
       if @ip.nil?
         cloud_error("No IP provided for vip network `#{@name}'")
       end
 
-      @logger.info("Associating server `#{server.id}' " \
-                   "with floating IP `#{@ip}'")
-
-      # Check if the OpenStack floating IP is allocated. If true, check
-      # if it is associated to any server, so we can disassociate it
-      # before associating it to the new server.
-      address_id = nil
-      addresses = openstack.addresses
-      addresses.each do |address|
-        if address.ip == @ip
-          address.server = nil unless address.instance_id.nil?
-          address.server = server
-          address_id = address.id
-          break
+      # Check if the OpenStack floating IP is allocated. If true, disassociate
+      # it from any server before associating it to the new server
+      address = openstack.addresses.find { |a| a.ip == @ip }
+      if address
+        unless address.instance_id.nil?
+          @logger.info("Disassociating floating IP `#{@ip}' " \
+                       "from server `#{address.instance_id}'")
+          address.server = nil
         end
-      end
-      if address_id.nil?
-        cloud_error("OpenStack CPI: floating IP #{@ip} not allocated")
+
+        @logger.info("Associating server `#{server.id}' " \
+                     "with floating IP `#{@ip}'")
+        address.server = server
+      else
+        cloud_error("Floating IP #{@ip} not allocated")
       end
     end
 
